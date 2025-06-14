@@ -1,30 +1,32 @@
 import streamlit as st
 
-# App title
-st.title("🤖 LifeBot AI")
-st.write("Welcome! I’m your all-in-one AI assistant for students, parents, professionals — and everyone in between.")
+# Set page config
+st.set_page_config(page_title="LifeBot AI", layout="centered")
 
-# Divider
-st.markdown("---")
+# Sidebar navigation
+st.sidebar.title("🧭 LifeBot AI Menu")
+page = st.sidebar.radio("Go to", ["Home", "Daily Companion", "Meal Planner", "Career Pathfinder", "Skill-Up AI"])
 
-# Navigation Buttons
-st.subheader("Choose what you'd like help with:")
-col1, col2 = st.columns(2)
+# --- PAGE CONTENT ---
+if page == "Home":
+    st.title("🤖 LifeBot AI")
+    st.write("Welcome! I’m your all-in-one AI assistant for students, parents, professionals — and everyone in between.")
+    st.markdown("---")
+    st.subheader("Choose a tool from the left menu to begin.")
+    st.write("🔒 Your data is safe. AI suggestions are personalized and private.")
 
-with col1:
-    if st.button("🧠 Daily Companion"):
-        st.write("Coming soon: mood check-ins, journaling, reminders!")
+elif page == "Daily Companion":
+    st.header("🧠 Daily Companion")
+    st.write("This section will include mood check-ins, journaling, and reminders. Coming soon!")
 
-    if st.button("🍽️ Nutrition & Meal Planner"):
-        st.write("Coming soon: personalized meals and healthy tips!")
+elif page == "Meal Planner":
+    st.header("🍽️ Nutrition & Meal Planner")
+    st.write("Here you'll find personalized meals and healthy tips. Coming soon!")
 
-with col2:
-    if st.button("💼 Career Pathfinder"):
-        st.write("Coming soon: explore jobs based on your skills and interests!")
+elif page == "Career Pathfinder":
+    st.header("💼 Career Pathfinder")
+    st.write("Explore careers based on your skills and interests. Coming soon!")
 
-    if st.button("📚 Skill-Up AI"):
-        st.write("Coming soon: learn anything, your way!")
-
-# Footer
-st.markdown("---")
-st.write("🔒 Your data is safe. AI suggestions are personalized and private.")
+elif page == "Skill-Up AI":
+    st.header("📚 Skill-Up AI")
+    st.write("Learn anything, your way! Coming soon.")
