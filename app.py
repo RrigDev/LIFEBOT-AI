@@ -1,7 +1,7 @@
 import streamlit as st
 
 # Set page config
-st.set_page_config(page_title="LifeBot AI", layout="centered")
+st.set_page_config(page_title="LifeBot-AI", layout="centered")
 
 # Sidebar navigation
 st.sidebar.title("🧭 LifeBot AI Menu")
