@@ -16,8 +16,9 @@ if page == "Home":
     st.write("🔒 Your data is safe. AI suggestions are personalized and private.")
 
 elif page == "Daily Companion":
+
     import pandas as pd
-import os
+    import os
 
 st.header("🧠 Daily Companion")
 st.subheader("📋 Today's Tasks")
@@ -56,6 +57,7 @@ if not tasks.empty:
             st.experimental_rerun()
 else:
     st.info("No tasks added yet!")
+
 
 
 elif page == "Meal Planner":
