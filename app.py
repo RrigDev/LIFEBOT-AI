@@ -16,8 +16,47 @@ if page == "Home":
     st.write("🔒 Your data is safe. AI suggestions are personalized and private.")
 
 elif page == "Daily Companion":
-    st.header("🧠 Daily Companion")
-    st.write("This section will include mood check-ins, journaling, and reminders. Coming soon!")
+    import pandas as pd
+import os
+
+st.header("🧠 Daily Companion")
+st.subheader("📋 Today's Tasks")
+
+# File to store tasks
+TASK_FILE = "tasks.csv"
+
+# Load tasks
+if os.path.exists(TASK_FILE):
+    tasks = pd.read_csv(TASK_FILE)
+else:
+    tasks = pd.DataFrame(columns=["Task", "Done"])
+
+# Add new task
+new_task = st.text_input("Add a new task:")
+if st.button("➕ Add Task"):
+    if new_task.strip():
+        tasks = tasks.append({"Task": new_task.strip(), "Done": False}, ignore_index=True)
+        tasks.to_csv(TASK_FILE, index=False)
+        st.experimental_rerun()
+
+# Show tasks
+if not tasks.empty:
+    for i, row in tasks.iterrows():
+        col1, col2 = st.columns([0.8, 0.2])
+        done = col1.checkbox(row["Task"], value=row["Done"])
+        delete = col2.button("🗑️", key=i)
+
+        if done != row["Done"]:
+            tasks.at[i, "Done"] = done
+            tasks.to_csv(TASK_FILE, index=False)
+
+        if delete:
+            tasks = tasks.drop(i)
+            tasks.to_csv(TASK_FILE, index=False)
+            st.experimental_rerun()
+else:
+    st.info("No tasks added yet!")
+
 
 elif page == "Meal Planner":
     st.header("🍽️ Nutrition & Meal Planner")
