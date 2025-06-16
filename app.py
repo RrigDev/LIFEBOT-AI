@@ -34,7 +34,8 @@ elif page == "Daily Companion":
     new_task = st.text_input("Add a new task:")
     if st.button("➕ Add Task"):
         if new_task.strip():
-            tasks = tasks.append({"Task": new_task.strip(), "Done": False}, ignore_index=True)
+            new_row = pd.DataFrame([{"Task": new_task.strip(), "Done": False}])
+            tasks = pd.concat([tasks, new_row], ignore_index=True)
             tasks.to_csv(TASK_FILE, index=False)
             st.experimental_rerun()
 
