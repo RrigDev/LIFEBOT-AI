@@ -33,11 +33,11 @@ elif page == "Daily Companion":
     # Add new task
     new_task = st.text_input("Add a new task:")
     if st.button("➕ Add Task"):
-       if new_task.strip():
-        new_row = pd.DataFrame([{"Task": new_task.strip(), "Done": False}])
-        tasks = pd.concat([tasks, new_row], ignore_index=True)
-        tasks.to_csv(TASK_FILE, index=False)
-        st.experimental_rerun()  # ✅ Safe inside button block
+        if new_task.strip():
+            new_row = pd.DataFrame([{"Task": new_task.strip(), "Done": False}])
+            tasks = pd.concat([tasks, new_row], ignore_index=True)
+            tasks.to_csv(TASK_FILE, index=False)
+            st.experimental_rerun()
 
     # Show tasks
     if not tasks.empty:
@@ -67,4 +67,4 @@ elif page == "Career Pathfinder":
 
 elif page == "Skill-Up AI":
     st.header("📚 Skill-Up AI")
-    st.write("Learn anything, your way! Coming soon.")
+    st.write("Learn anything, your way! Coming soon!")
