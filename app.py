@@ -34,7 +34,7 @@ elif page == "Daily Companion":
             new_row = pd.DataFrame([{"Task": new_task.strip(), "Done": False}])
             tasks = pd.concat([tasks, new_row], ignore_index=True)
             tasks.to_csv(TASK_FILE, index=False)
-            st.experimental_rerun()
+            st.rerun()
 
     total = len(tasks)
     done_count = tasks["Done"].sum()
@@ -51,12 +51,12 @@ elif page == "Daily Companion":
             if done != row["Done"]:
                 tasks.at[i, "Done"] = done
                 tasks.to_csv(TASK_FILE, index=False)
-                st.experimental_rerun()
+                st.rerun()
 
             if delete:
                 tasks = tasks.drop(i)
                 tasks.to_csv(TASK_FILE, index=False)
-                st.experimental_rerun()
+                st.rerun()
     else:
         st.info("No tasks added yet!")
 elif page == "Meal Planner":
