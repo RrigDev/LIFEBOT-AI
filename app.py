@@ -63,8 +63,12 @@ elif page == "Daily Companion":
     total = len(tasks)
     done_count = tasks["Done"].sum()
     if total > 0:
-        st.progress(done_count / total)
-        st.markdown(f"✅ **{done_count} of {total} tasks completed**")
+        progress_ratio = done_count / total
+        progress_percent = int(progress_ratio * 100)
+
+        st.progress(progress_ratio)
+        st.markdown(f"✅ **{done_count} of {total} tasks completed ({progress_percent}%)**")
+
     else:
         st.info("No tasks added yet!")
 
