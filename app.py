@@ -5,19 +5,19 @@ import os
 # Set page config
 st.set_page_config(page_title="LifeBot AI", layout="centered")
 
-# Sidebar role selector
+# Sidebar navigation
 st.sidebar.title("🧭 LifeBot AI Menu")
 role = st.sidebar.radio("Select your role:", ["🎓 Student", "👩‍💼 Adult", "👴 Senior Citizen"])
 
 # Define navigation options based on role
 if role == "🎓 Student":
-    menu_options = ["Home", "Daily Companion", "Meal Planner", "Career Pathfinder"]
+    options = ["Home", "Daily Companion", "Meal Planner", "Career Pathfinder", "Skill-Up AI"]
 elif role == "👩‍💼 Adult":
-    menu_options = ["Home", "Daily Companion", "Meal Planner", "Manage Finances"]
+    options = ["Home", "Daily Companion", "Meal Planner", "Manage Finances", "Skill-Up AI"]
 else:
-    menu_options = ["Home", "Daily Companion", "Meal Planner", "Manage Finances"]
+    options = ["Home", "Daily Companion", "Meal Planner", "Manage Finances", "Skill-Up AI"]
 
-page = st.sidebar.radio("Go to", menu_options)
+page = st.sidebar.radio("Go to", options)
 
 # --- PAGE CONTENT ---
 if page == "Home":
@@ -98,7 +98,7 @@ elif page == "Career Pathfinder":
 
 elif page == "Manage Finances":
     st.header("💰 Manage Finances")
-    st.write("Learn how to budget, save, and grow your money. Coming soon!")
+    st.write("Tools to track spending, budgeting and savings. Coming soon!")
 
 elif page == "Skill-Up AI":
     st.header("📚 Skill-Up AI")
