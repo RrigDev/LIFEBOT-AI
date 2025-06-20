@@ -7,17 +7,18 @@ st.set_page_config(page_title="LifeBot AI", layout="centered")
 
 # Sidebar navigation
 st.sidebar.title("🧭 LifeBot AI Menu")
-role = st.sidebar.radio("Select your role:", ["🎓 Student", "👩‍💼 Adult", "👴 Senior Citizen"])
+user_type = st.sidebar.radio("Who are you?", ["Student", "Adult", "Senior Citizen"], horizontal=True)
 
-# Define navigation options based on role
-if role == "🎓 Student":
-    options = ["Home", "Daily Companion", "Meal Planner", "Career Pathfinder", "Skill-Up AI"]
-elif role == "👩‍💼 Adult":
-    options = ["Home", "Daily Companion", "Meal Planner", "Manage Finances", "Skill-Up AI"]
-else:
-    options = ["Home", "Daily Companion", "Meal Planner", "Manage Finances", "Skill-Up AI"]
+# Dynamic page options based on user type
+pages = ["Home", "Daily Companion"]
+if user_type == "Student":
+    pages.append("Career Pathfinder")
+elif user_type == "Senior Citizen":
+    pages.append("Managing Finances")
+pages.append("Skill-Up AI")
+pages.append("Meal Planner")
 
-page = st.sidebar.radio("Go to", options)
+page = st.sidebar.radio("Go to", pages)
 
 # --- PAGE CONTENT ---
 if page == "Home":
@@ -37,7 +38,7 @@ elif page == "Daily Companion":
     if os.path.exists(TASK_FILE):
         tasks = pd.read_csv(TASK_FILE)
     else:
-        tasks = pd.DataFrame(columns=["Task", "Done", "Due Date", "Category"])
+        tasks = pd.DataFrame(columns=["Task", "Done", "Due Date", "Category", "Completed Date"])
 
     # --- Add New Task ---
     with st.form("add_task_form", clear_on_submit=True):
@@ -51,7 +52,8 @@ elif page == "Daily Companion":
                 "Task": new_task.strip(),
                 "Done": False,
                 "Due Date": due_date,
-                "Category": category
+                "Category": category,
+                "Completed Date": pd.NaT
             }])
             tasks = pd.concat([tasks, new_row], ignore_index=True)
             tasks.to_csv(TASK_FILE, index=False)
@@ -80,6 +82,10 @@ elif page == "Daily Companion":
 
         if done != row["Done"]:
             tasks.at[i, "Done"] = done
+            if done:
+                tasks.at[i, "Completed Date"] = pd.Timestamp.today().normalize()
+            else:
+                tasks.at[i, "Completed Date"] = pd.NaT
             tasks.to_csv(TASK_FILE, index=False)
             st.rerun()
 
@@ -87,6 +93,16 @@ elif page == "Daily Companion":
             tasks = tasks.drop(i)
             tasks.to_csv(TASK_FILE, index=False)
             st.rerun()
+
+    # --- Task Completion Over Time Chart ---
+    if "Completed Date" in tasks.columns:
+        completed_tasks = tasks[tasks["Done"] == True].copy()
+        completed_tasks["Completed Date"] = pd.to_datetime(completed_tasks["Completed Date"])
+        chart_data = completed_tasks.groupby("Completed Date").size()
+
+        if not chart_data.empty:
+            st.subheader("📊 Task Completion Over Time")
+            st.bar_chart(chart_data)
 
 elif page == "Meal Planner":
     st.header("🍽️ Nutrition & Meal Planner")
@@ -96,9 +112,9 @@ elif page == "Career Pathfinder":
     st.header("💼 Career Pathfinder")
     st.write("Explore careers based on your skills and interests. Coming soon!")
 
-elif page == "Manage Finances":
-    st.header("💰 Manage Finances")
-    st.write("Tools to track spending, budgeting and savings. Coming soon!")
+elif page == "Managing Finances":
+    st.header("💰 Managing Finances")
+    st.write("Financial planning tools and tips. Coming soon!")
 
 elif page == "Skill-Up AI":
     st.header("📚 Skill-Up AI")
