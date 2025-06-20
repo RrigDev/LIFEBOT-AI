@@ -63,14 +63,37 @@ elif page == "Daily Companion":
     total = len(tasks)
     done_count = tasks["Done"].sum()
     if total > 0:
-        progress_ratio = done_count / total
-        progress_percent = int(progress_ratio * 100)
-
-        st.progress(progress_ratio)
-        st.markdown(f"✅ **{done_count} of {total} tasks completed ({progress_percent}%)**")
-
+        st.progress(done_count / total)
+        st.markdown(f"✅ **{done_count} of {total} tasks completed**")
     else:
         st.info("No tasks added yet!")
+
+    # --- Completion History and Altair Chart ---
+    HISTORY_FILE = "task_history.csv"
+    today_str = pd.Timestamp.today().strftime("%Y-%m-%d")
+
+    if os.path.exists(HISTORY_FILE):
+        history = pd.read_csv(HISTORY_FILE)
+    else:
+        history = pd.DataFrame(columns=["Date", "Completed"])
+
+    if today_str in history["Date"].values:
+        history.loc[history["Date"] == today_str, "Completed"] = done_count
+    else:
+        new_entry = pd.DataFrame([{"Date": today_str, "Completed": done_count}])
+        history = pd.concat([history, new_entry], ignore_index=True)
+
+    history.to_csv(HISTORY_FILE, index=False)
+
+    import altair as alt
+    chart = alt.Chart(history).mark_bar(color="#74b9ff").encode(
+        x="Date:T",
+        y=alt.Y("Completed:Q", title="Tasks Completed")
+    ).properties(
+        title="📊 Task Completion Over Time"
+    )
+
+    st.altair_chart(chart, use_container_width=True)
 
     # --- Sort and Display Tasks ---
     tasks_sorted = tasks.sort_values(by=["Done", "Due Date"])
@@ -80,7 +103,7 @@ elif page == "Daily Companion":
         with col1:
             done = st.checkbox(f"{row['Task']} [{row['Category']}] (Due: {row['Due Date']})", value=row["Done"], key=f"done_{i}")
         with col2:
-            st.write("")  # Spacer
+            st.write("")
         with col3:
             delete = st.button("🗑️", key=f"del_{i}")
 
@@ -97,16 +120,6 @@ elif page == "Daily Companion":
             tasks = tasks.drop(i)
             tasks.to_csv(TASK_FILE, index=False)
             st.rerun()
-
-    # --- Task Completion Over Time Chart ---
-    if "Completed Date" in tasks.columns:
-        completed_tasks = tasks[tasks["Done"] == True].copy()
-        completed_tasks["Completed Date"] = pd.to_datetime(completed_tasks["Completed Date"])
-        chart_data = completed_tasks.groupby("Completed Date").size()
-
-        if not chart_data.empty:
-            st.subheader("📊 Task Completion Over Time")
-            st.bar_chart(chart_data)
 
 elif page == "Meal Planner":
     st.header("🍽️ Nutrition & Meal Planner")
