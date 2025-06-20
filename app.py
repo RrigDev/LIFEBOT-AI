@@ -21,16 +21,13 @@ elif page == "Daily Companion":
     st.header("🧠 Daily Companion")
     st.subheader("📋 Today's Tasks")
 
-    # File to store tasks
     TASK_FILE = "tasks.csv"
 
-    # Load tasks
     if os.path.exists(TASK_FILE):
         tasks = pd.read_csv(TASK_FILE)
     else:
         tasks = pd.DataFrame(columns=["Task", "Done"])
 
-    # Add new task
     new_task = st.text_input("Add a new task:")
     if st.button("➕ Add Task"):
         if new_task.strip():
@@ -39,16 +36,22 @@ elif page == "Daily Companion":
             tasks.to_csv(TASK_FILE, index=False)
             st.experimental_rerun()
 
-    # Show tasks
-    if not tasks.empty:
-        for i, row in tasks.iterrows():
+    total = len(tasks)
+    done_count = tasks["Done"].sum()
+    st.markdown(f"✅ **{done_count} of {total} tasks completed**")
+
+    tasks_sorted = tasks.sort_values("Done")
+
+    if not tasks_sorted.empty:
+        for i, row in tasks_sorted.iterrows():
             col1, col2 = st.columns([0.8, 0.2])
-            done = col1.checkbox(row["Task"], value=row["Done"])
-            delete = col2.button("🗑️", key=i)
+            done = col1.checkbox(row["Task"], value=row["Done"], key=f"check_{i}")
+            delete = col2.button("🗑️", key=f"del_{i}")
 
             if done != row["Done"]:
                 tasks.at[i, "Done"] = done
                 tasks.to_csv(TASK_FILE, index=False)
+                st.experimental_rerun()
 
             if delete:
                 tasks = tasks.drop(i)
@@ -56,7 +59,6 @@ elif page == "Daily Companion":
                 st.experimental_rerun()
     else:
         st.info("No tasks added yet!")
-
 elif page == "Meal Planner":
     st.header("🍽️ Nutrition & Meal Planner")
     st.write("Here you'll find personalized meals and healthy tips. Coming soon!")
