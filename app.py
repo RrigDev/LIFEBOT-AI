@@ -77,6 +77,7 @@ elif page == "Daily Companion":
             tasks = tasks.drop(i)
             tasks.to_csv(TASK_FILE, index=False)
             st.rerun()
+
 elif page == "Meal Planner":
     st.header("🍽️ Nutrition & Meal Planner")
     st.write("Here you'll find personalized meals and healthy tips. Coming soon!")
