@@ -23,42 +23,60 @@ elif page == "Daily Companion":
 
     TASK_FILE = "tasks.csv"
 
+    # Load existing tasks
     if os.path.exists(TASK_FILE):
         tasks = pd.read_csv(TASK_FILE)
     else:
-        tasks = pd.DataFrame(columns=["Task", "Done"])
+        tasks = pd.DataFrame(columns=["Task", "Done", "Due Date", "Category"])
 
-    new_task = st.text_input("Add a new task:")
-    if st.button("➕ Add Task"):
-        if new_task.strip():
-            new_row = pd.DataFrame([{"Task": new_task.strip(), "Done": False}])
+    # --- Add New Task ---
+    with st.form("add_task_form", clear_on_submit=True):
+        new_task = st.text_input("📝 Task")
+        due_date = st.date_input("📅 Due Date")
+        category = st.selectbox("🏷️ Category", ["Study", "Work", "Personal", "Health", "Other"])
+        submitted = st.form_submit_button("➕ Add Task")
+
+        if submitted and new_task.strip():
+            new_row = pd.DataFrame([{
+                "Task": new_task.strip(),
+                "Done": False,
+                "Due Date": due_date,
+                "Category": category
+            }])
             tasks = pd.concat([tasks, new_row], ignore_index=True)
             tasks.to_csv(TASK_FILE, index=False)
             st.rerun()
 
+    # --- Task Progress ---
     total = len(tasks)
     done_count = tasks["Done"].sum()
-    st.markdown(f"✅ **{done_count} of {total} tasks completed**")
-
-    tasks_sorted = tasks.sort_values("Done")
-
-    if not tasks_sorted.empty:
-        for i, row in tasks_sorted.iterrows():
-            col1, col2 = st.columns([0.8, 0.2])
-            done = col1.checkbox(row["Task"], value=row["Done"], key=f"check_{i}")
-            delete = col2.button("🗑️", key=f"del_{i}")
-
-            if done != row["Done"]:
-                tasks.at[i, "Done"] = done
-                tasks.to_csv(TASK_FILE, index=False)
-                st.rerun()
-
-            if delete:
-                tasks = tasks.drop(i)
-                tasks.to_csv(TASK_FILE, index=False)
-                st.rerun()
+    if total > 0:
+        st.progress(done_count / total)
+        st.markdown(f"✅ **{done_count} of {total} tasks completed**")
     else:
         st.info("No tasks added yet!")
+
+    # --- Sort and Display Tasks ---
+    tasks_sorted = tasks.sort_values(by=["Done", "Due Date"])
+
+    for i, row in tasks_sorted.iterrows():
+        col1, col2, col3 = st.columns([0.5, 0.3, 0.2])
+        with col1:
+            done = st.checkbox(f"{row['Task']} [{row['Category']}] (Due: {row['Due Date']})", value=row["Done"], key=f"done_{i}")
+        with col2:
+            st.write("")  # Spacer
+        with col3:
+            delete = st.button("🗑️", key=f"del_{i}")
+
+        if done != row["Done"]:
+            tasks.at[i, "Done"] = done
+            tasks.to_csv(TASK_FILE, index=False)
+            st.rerun()
+
+        if delete:
+            tasks = tasks.drop(i)
+            tasks.to_csv(TASK_FILE, index=False)
+            st.rerun()
 elif page == "Meal Planner":
     st.header("🍽️ Nutrition & Meal Planner")
     st.write("Here you'll find personalized meals and healthy tips. Coming soon!")
