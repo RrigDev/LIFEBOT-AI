@@ -6,42 +6,50 @@ import altair as alt
 # Set page config
 st.set_page_config(page_title="LifeBot AI", layout="centered")
 
-# Sidebar navigation
+# --- Sidebar Profile Button and Page Tracking ---
+if "page" not in st.session_state:
+    st.session_state.page = "Home"
+
+# Profile button (not in radio menu)
+if st.sidebar.button("👤 Go to Profile"):
+    st.session_state.page = "Profile"
+
+# User type selector
 st.sidebar.title("🧭 LifeBot AI Menu")
 user_type = st.sidebar.radio("Who are you?", ["Student", "Adult", "Senior Citizen"], horizontal=True)
 
-# Build the page list
+# Dynamic page options (excluding Profile)
 pages = ["Home", "Daily Companion"]
 if user_type == "Student":
     pages.append("Career Pathfinder")
 elif user_type in ["Adult", "Senior Citizen"]:
     pages.append("Managing Finances")
-pages.extend(["Skill-Up AI", "Meal Planner"])
+pages.append("Skill-Up AI")
+pages.append("Meal Planner")
 
-# Safe session state defaulting
-if "page" not in st.session_state or st.session_state.page not in pages:
-    st.session_state.page = "Home"
+# Sidebar navigation (excluding Profile)
+selected_page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page) if st.session_state.page in pages else 0)
+if selected_page != st.session_state.page:
+    st.session_state.page = selected_page
 
-selected_page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page))
-st.session_state.page = selected_page
+# Use the session state value to control page
+page = st.session_state.page
 
 # --- PAGE CONTENT ---
-if selected_page == "Home":
+if page == "Home":
     st.title("🤖 LifeBot AI")
     st.write("Welcome! I’m your all-in-one AI assistant for students, parents, professionals — and everyone in between.")
     st.markdown("---")
     st.subheader("Choose a tool from the left menu to begin.")
     st.write("🔒 Your data is safe. AI suggestions are personalized and private.")
 
-elif selected_page == "Daily Companion":
+elif page == "Daily Companion":
     st.header("🧠 Daily Companion")
 
-    tabs = st.tabs(["📋 Tasks", "📓 Journal", "💬 Chatbot"])
+    tab1, tab2, tab3 = st.tabs(["📋 Tasks", "📓 Journal", "💬 Chatbot"])
 
-    # TASKS TAB
-    with tabs[0]:
+    with tab1:
         TASK_FILE = "tasks.csv"
-
         if os.path.exists(TASK_FILE):
             tasks = pd.read_csv(TASK_FILE)
         else:
@@ -98,15 +106,13 @@ elif selected_page == "Daily Companion":
                 tasks.to_csv(TASK_FILE, index=False)
                 st.rerun()
 
-    # JOURNAL TAB
-    with tabs[1]:
+    with tab2:
         st.text_area("Write your thoughts here:")
 
-    # CHATBOT TAB
-    with tabs[2]:
+    with tab3:
         st.write("Coming soon: Chat with your AI companion!")
 
-elif selected_page == "Profile":
+elif page == "Profile":
     st.header("👤 Your Profile")
 
     HISTORY_FILE = "task_history.csv"
@@ -143,18 +149,18 @@ elif selected_page == "Profile":
 
     st.altair_chart(chart, use_container_width=True)
 
-elif selected_page == "Meal Planner":
+elif page == "Meal Planner":
     st.header("🍽️ Nutrition & Meal Planner")
     st.write("Here you'll find personalized meals and healthy tips. Coming soon!")
 
-elif selected_page == "Career Pathfinder":
+elif page == "Career Pathfinder":
     st.header("💼 Career Pathfinder")
     st.write("Explore careers based on your skills and interests. Coming soon!")
 
-elif selected_page == "Managing Finances":
+elif page == "Managing Finances":
     st.header("💰 Managing Finances")
     st.write("Financial planning tools and tips. Coming soon!")
 
-elif selected_page == "Skill-Up AI":
+elif page == "Skill-Up AI":
     st.header("📚 Skill-Up AI")
     st.write("Learn anything, your way! Coming soon!")
