@@ -9,10 +9,11 @@ st.set_page_config(page_title="LifeBot AI", layout="centered")
 # Sidebar navigation
 st.sidebar.title("🧭 LifeBot AI Menu")
 
-# Add profile button on top of sidebar
+# Profile button (acts like a module)
 if st.sidebar.button("👤 Go to Profile"):
     st.session_state.page = "Profile"
 
+# User type selection
 user_type = st.sidebar.radio("Who are you?", ["Student", "Adult", "Senior Citizen"], horizontal=True)
 
 # Dynamic page options based on user type
@@ -23,30 +24,28 @@ elif user_type in ["Adult", "Senior Citizen"]:
     pages.append("Managing Finances")
 pages.append("Skill-Up AI")
 pages.append("Meal Planner")
-pages.append("Profile")
 
-# Maintain navigation state across interactions
+# Maintain session state for page navigation
 if "page" not in st.session_state:
     st.session_state.page = "Home"
 
 selected_page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page))
 st.session_state.page = selected_page
-page = selected_page
 
 # --- PAGE CONTENT ---
-if page == "Home":
+if st.session_state.page == "Home":
     st.title("🤖 LifeBot AI")
     st.write("Welcome! I’m your all-in-one AI assistant for students, parents, professionals — and everyone in between.")
     st.markdown("---")
     st.subheader("Choose a tool from the left menu to begin.")
     st.write("🔒 Your data is safe. AI suggestions are personalized and private.")
 
-elif page == "Daily Companion":
+elif st.session_state.page == "Daily Companion":
     st.header("🧠 Daily Companion")
+    tab1, tab2, tab3 = st.tabs(["📋 Tasks", "📓 Journal", "💬 Chatbot"])
 
-    with st.expander("📋 Task Manager"):
+    with tab1:
         TASK_FILE = "tasks.csv"
-
         if os.path.exists(TASK_FILE):
             tasks = pd.read_csv(TASK_FILE)
         else:
@@ -103,13 +102,13 @@ elif page == "Daily Companion":
                 tasks.to_csv(TASK_FILE, index=False)
                 st.rerun()
 
-    with st.expander("📓 Journal"):
+    with tab2:
         st.text_area("Write your thoughts here:")
 
-    with st.expander("💬 Companion Chatbot"):
+    with tab3:
         st.write("Coming soon: Chat with your AI companion!")
 
-elif page == "Profile":
+elif st.session_state.page == "Profile":
     st.header("👤 Your Profile")
 
     HISTORY_FILE = "task_history.csv"
@@ -143,21 +142,20 @@ elif page == "Profile":
         width=700,
         height=300
     )
-
     st.altair_chart(chart, use_container_width=True)
 
-elif page == "Meal Planner":
+elif st.session_state.page == "Meal Planner":
     st.header("🍽️ Nutrition & Meal Planner")
     st.write("Here you'll find personalized meals and healthy tips. Coming soon!")
 
-elif page == "Career Pathfinder":
+elif st.session_state.page == "Career Pathfinder":
     st.header("💼 Career Pathfinder")
     st.write("Explore careers based on your skills and interests. Coming soon!")
 
-elif page == "Managing Finances":
+elif st.session_state.page == "Managing Finances":
     st.header("💰 Managing Finances")
     st.write("Financial planning tools and tips. Coming soon!")
 
-elif page == "Skill-Up AI":
+elif st.session_state.page == "Skill-Up AI":
     st.header("📚 Skill-Up AI")
     st.write("Learn anything, your way! Coming soon!")
