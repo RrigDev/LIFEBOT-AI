@@ -9,9 +9,8 @@ st.set_page_config(page_title="LifeBot AI", layout="centered")
 # --- Sidebar ---
 st.sidebar.title("🧭 LifeBot AI Menu")
 
-# Profile button (top of sidebar)
-if st.sidebar.button("👤 Go to Profile"):
-    st.session_state.page = "Profile"
+# --- Profile Button Handling ---
+go_to_profile = st.sidebar.button("👤 Go to Profile")
 
 # User type selection
 user_type = st.sidebar.radio("Who are you?", ["Student", "Adult", "Senior Citizen"], horizontal=True)
@@ -25,18 +24,21 @@ elif user_type in ["Adult", "Senior Citizen"]:
 pages.append("Skill-Up AI")
 pages.append("Meal Planner")
 
-## Page selection logic
+# Initialize session state
 if "page" not in st.session_state:
     st.session_state.page = "Home"
 
-if st.session_state.page in pages:
-    selected_index = pages.index(st.session_state.page)
+# If profile button is clicked, override page
+if go_to_profile:
+    st.session_state.page = "Profile"
 else:
-    selected_index = 0
-
-selected_page = st.sidebar.radio("Go to", pages, index=selected_index)
-st.session_state.page = selected_page
-
+    # Only update from radio if profile button wasn’t just clicked
+    if st.session_state.page in pages:
+        selected_index = pages.index(st.session_state.page)
+    else:
+        selected_index = 0
+    selected_page = st.sidebar.radio("Go to", pages, index=selected_index)
+    st.session_state.page = selected_page
 # --- PAGE CONTENT ---
 if st.session_state.page == "Home":
     st.title("🤖 LifeBot AI")
