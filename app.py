@@ -25,11 +25,16 @@ elif user_type in ["Adult", "Senior Citizen"]:
 pages.append("Skill-Up AI")
 pages.append("Meal Planner")
 
-# Page selection logic
+## Page selection logic
 if "page" not in st.session_state:
     st.session_state.page = "Home"
 
-selected_page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page))
+if st.session_state.page in pages:
+    selected_index = pages.index(st.session_state.page)
+else:
+    selected_index = 0
+
+selected_page = st.sidebar.radio("Go to", pages, index=selected_index)
 st.session_state.page = selected_page
 
 # --- PAGE CONTENT ---
