@@ -6,6 +6,36 @@ import altair as alt
 # Set page config
 st.set_page_config(page_title="LifeBot AI", layout="centered")
 
+# --- Custom Header with Profile Button and Centered Title ---
+st.markdown("""
+    <style>
+        .profile-button {
+            display: inline-block;
+            font-size: 16px;
+            padding: 6px 12px;
+            background-color: #dfe6e9;
+            border-radius: 8px;
+            text-decoration: none;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        .header-title {
+            font-size: 28px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .block-container {
+            padding-top: 0rem;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+top_col1, top_col2 = st.columns([1, 5])
+with top_col1:
+    profile_clicked = st.button("👤 Profile")
+with top_col2:
+    st.markdown('<div class="header-title">LifeBot AI</div>', unsafe_allow_html=True)
+
 # Sidebar navigation
 st.sidebar.title("🧭 LifeBot AI Menu")
 user_type = st.sidebar.radio("Who are you?", ["Student", "Adult", "Senior Citizen"], horizontal=True)
@@ -14,15 +44,15 @@ user_type = st.sidebar.radio("Who are you?", ["Student", "Adult", "Senior Citize
 pages = ["Home", "Daily Companion"]
 if user_type == "Student":
     pages.append("Career Pathfinder")
-elif user_type == "Adult":
-    pages.append("Managing Finances")
-elif user_type == "Senior Citizen":
+elif user_type in ["Adult", "Senior Citizen"]:
     pages.append("Managing Finances")
 pages.append("Skill-Up AI")
 pages.append("Meal Planner")
-pages.append("Profile")
 
-page = st.sidebar.radio("Go to", pages)
+if profile_clicked:
+    page = "Profile"
+else:
+    page = st.sidebar.radio("Go to", pages)
 
 # --- PAGE CONTENT ---
 if page == "Home":
@@ -111,7 +141,6 @@ elif page == "Profile":
     else:
         tasks = pd.DataFrame(columns=["Task", "Done", "Completed Date"])
 
-    # Update history
     done_count_today = tasks[(tasks["Done"] == True) & (pd.to_datetime(tasks["Completed Date"]).dt.strftime("%Y-%m-%d") == today_str)].shape[0]
 
     if os.path.exists(HISTORY_FILE):
