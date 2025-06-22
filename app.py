@@ -29,6 +29,9 @@ pages.append("Meal Planner")
 if "page" not in st.session_state:
     st.session_state.page = "Home"
 
+if "page" not in st.session_state:
+    st.session_state.page = "Home"  # or any default like "Daily Companion"
+
 selected_page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page))
 st.session_state.page = selected_page
 
@@ -159,3 +162,4 @@ elif st.session_state.page == "Managing Finances":
 elif st.session_state.page == "Skill-Up AI":
     st.header("📚 Skill-Up AI")
     st.write("Learn anything, your way! Coming soon!")
+ 		
