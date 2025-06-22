@@ -8,29 +8,23 @@ st.set_page_config(page_title="LifeBot AI", layout="centered")
 
 # Sidebar navigation
 st.sidebar.title("🧭 LifeBot AI Menu")
-
-# Profile button (acts like a module)
-if st.sidebar.button("👤 Go to Profile"):
+st.sidebar.markdown("### 👤 Profile")
+if st.sidebar.button("Go to Profile"):
     st.session_state.page = "Profile"
 
-# User type selection
 user_type = st.sidebar.radio("Who are you?", ["Student", "Adult", "Senior Citizen"], horizontal=True)
 
-# Dynamic page options based on user type
+# Define dynamic pages
 pages = ["Home", "Daily Companion"]
 if user_type == "Student":
     pages.append("Career Pathfinder")
 elif user_type in ["Adult", "Senior Citizen"]:
     pages.append("Managing Finances")
-pages.append("Skill-Up AI")
-pages.append("Meal Planner")
+pages.extend(["Skill-Up AI", "Meal Planner"])  # Shared tools
 
-# Maintain session state for page navigation
+# Keep profile out of this list (it has its own button)
 if "page" not in st.session_state:
     st.session_state.page = "Home"
-
-if "page" not in st.session_state:
-    st.session_state.page = "Home"  # or any default like "Daily Companion"
 
 selected_page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page))
 st.session_state.page = selected_page
