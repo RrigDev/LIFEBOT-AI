@@ -2,8 +2,6 @@ import streamlit as st
 import pandas as pd
 import os
 import altair as alt
-from datetime import datetime
-import pytz
 
 # Set page config
 st.set_page_config(page_title="LifeBot AI", layout="centered")
@@ -16,10 +14,13 @@ user_type = st.sidebar.radio("Who are you?", ["Student", "Adult", "Senior Citize
 pages = ["Home", "Daily Companion"]
 if user_type == "Student":
     pages.append("Career Pathfinder")
+elif user_type == "Adult":
+    pages.append("Managing Finances")
 elif user_type == "Senior Citizen":
     pages.append("Managing Finances")
 pages.append("Skill-Up AI")
 pages.append("Meal Planner")
+pages.append("Profile")
 
 page = st.sidebar.radio("Go to", pages)
 
@@ -34,25 +35,17 @@ if page == "Home":
 elif page == "Daily Companion":
     st.header("🧠 Daily Companion")
 
-    tabs = st.tabs(["📋 Tasks", "📓 Journal", "💬 Companion Bot"])
-
-    ### --- TASK TAB --- ###
-    with tabs[0]:
-        st.subheader("📋 Today's Tasks")
-
+    with st.expander("📋 Task Manager"):
         TASK_FILE = "tasks.csv"
-        today_ist = datetime.now(pytz.timezone("Asia/Kolkata")).date()
 
-        # Load existing tasks
         if os.path.exists(TASK_FILE):
             tasks = pd.read_csv(TASK_FILE)
         else:
             tasks = pd.DataFrame(columns=["Task", "Done", "Due Date", "Category", "Completed Date"])
 
-        # --- Add New Task ---
         with st.form("add_task_form", clear_on_submit=True):
             new_task = st.text_input("📝 Task")
-            due_date = st.date_input("📅 Due Date", min_value=today_ist)
+            due_date = st.date_input("📅 Due Date")
             category = st.radio("🏷️ Category", ["Study", "Work", "Personal", "Health", "Other"], horizontal=True)
             submitted = st.form_submit_button("➕ Add Task")
 
@@ -68,7 +61,6 @@ elif page == "Daily Companion":
                 tasks.to_csv(TASK_FILE, index=False)
                 st.rerun()
 
-        # --- Task Progress ---
         total = len(tasks)
         done_count = tasks["Done"].sum()
         if total > 0:
@@ -77,33 +69,6 @@ elif page == "Daily Companion":
         else:
             st.info("No tasks added yet!")
 
-        # --- Completion History and Chart ---
-        HISTORY_FILE = "task_history.csv"
-        today_str = pd.Timestamp.today().strftime("%Y-%m-%d")
-
-        if os.path.exists(HISTORY_FILE):
-            history = pd.read_csv(HISTORY_FILE)
-        else:
-            history = pd.DataFrame(columns=["Date", "Completed"])
-
-        if today_str in history["Date"].values:
-            history.loc[history["Date"] == today_str, "Completed"] = done_count
-        else:
-            new_entry = pd.DataFrame([{"Date": today_str, "Completed": done_count}])
-            history = pd.concat([history, new_entry], ignore_index=True)
-
-        history.to_csv(HISTORY_FILE, index=False)
-
-        chart = alt.Chart(history).mark_bar(color="#74b9ff").encode(
-            x="Date:T",
-            y=alt.Y("Completed:Q", title="Tasks Completed")
-        ).properties(
-            title="📊 Task Completion Over Time"
-        )
-
-        st.altair_chart(chart, use_container_width=True)
-
-        # --- Sort and Display Tasks ---
         tasks_sorted = tasks.sort_values(by=["Done", "Due Date"])
 
         for i, row in tasks_sorted.iterrows():
@@ -129,26 +94,49 @@ elif page == "Daily Companion":
                 tasks.to_csv(TASK_FILE, index=False)
                 st.rerun()
 
-    ### --- JOURNAL TAB --- ###
-    with tabs[1]:
-        st.subheader("📓 Daily Journal")
-        JOURNAL_FILE = "journal.csv"
-        journal_entry = st.text_area("How was your day? Write your thoughts here:")
-        if st.button("Save Entry"):
-            today_str = pd.Timestamp.today().strftime("%Y-%m-%d")
-            new_entry = pd.DataFrame([{"Date": today_str, "Entry": journal_entry}])
-            if os.path.exists(JOURNAL_FILE):
-                old_entries = pd.read_csv(JOURNAL_FILE)
-                all_entries = pd.concat([old_entries, new_entry], ignore_index=True)
-            else:
-                all_entries = new_entry
-            all_entries.to_csv(JOURNAL_FILE, index=False)
-            st.success("Journal entry saved!")
+    with st.expander("📓 Journal"):
+        st.text_area("Write your thoughts here:")
 
-    ### --- COMPANION BOT TAB --- ###
-    with tabs[2]:
-        st.subheader("💬 Companion Bot")
-        st.info("Coming soon: Chat with your AI buddy for advice, ideas, or just a quick mood boost!")
+    with st.expander("💬 Companion Chatbot"):
+        st.write("Coming soon: Chat with your AI companion!")
+
+elif page == "Profile":
+    st.header("👤 Your Profile")
+
+    HISTORY_FILE = "task_history.csv"
+    today_str = pd.Timestamp.today().strftime("%Y-%m-%d")
+
+    if os.path.exists("tasks.csv"):
+        tasks = pd.read_csv("tasks.csv")
+    else:
+        tasks = pd.DataFrame(columns=["Task", "Done", "Completed Date"])
+
+    # Update history
+    done_count_today = tasks[(tasks["Done"] == True) & (pd.to_datetime(tasks["Completed Date"]).dt.strftime("%Y-%m-%d") == today_str)].shape[0]
+
+    if os.path.exists(HISTORY_FILE):
+        history = pd.read_csv(HISTORY_FILE)
+    else:
+        history = pd.DataFrame(columns=["Date", "Completed"])
+
+    if today_str in history["Date"].values:
+        history.loc[history["Date"] == today_str, "Completed"] = done_count_today
+    else:
+        new_entry = pd.DataFrame([{"Date": today_str, "Completed": done_count_today}])
+        history = pd.concat([history, new_entry], ignore_index=True)
+
+    history.to_csv(HISTORY_FILE, index=False)
+
+    st.subheader("📊 Your Task Completion Over Time")
+    chart = alt.Chart(history).mark_bar(color="#0984e3").encode(
+        x="Date:T",
+        y=alt.Y("Completed:Q", title="Tasks Completed")
+    ).properties(
+        width=700,
+        height=300
+    )
+
+    st.altair_chart(chart, use_container_width=True)
 
 elif page == "Meal Planner":
     st.header("🍽️ Nutrition & Meal Planner")
