@@ -6,41 +6,32 @@ import altair as alt
 # Set page config
 st.set_page_config(page_title="LifeBot AI", layout="centered")
 
-# Custom top-left profile button using markdown
-st.markdown("""
-    <style>
-    .profile-button {
-        position: absolute;
-        top: 15px;
-        left: 15px;
-        background-color: #0984e3;
-        color: white;
-        padding: 8px 16px;
-        border-radius: 8px;
-        font-weight: bold;
-        text-decoration: none;
-    }
-    </style>
-    <a href="?page=Profile" class="profile-button">👤 Profile</a>
-""", unsafe_allow_html=True)
-
 # Sidebar navigation
 st.sidebar.title("🧭 LifeBot AI Menu")
+
+# Add profile button on top of sidebar
+if st.sidebar.button("👤 Go to Profile"):
+    st.session_state.page = "Profile"
+
 user_type = st.sidebar.radio("Who are you?", ["Student", "Adult", "Senior Citizen"], horizontal=True)
 
 # Dynamic page options based on user type
 pages = ["Home", "Daily Companion"]
 if user_type == "Student":
     pages.append("Career Pathfinder")
-elif user_type == "Adult":
-    pages.append("Managing Finances")
-elif user_type == "Senior Citizen":
+elif user_type in ["Adult", "Senior Citizen"]:
     pages.append("Managing Finances")
 pages.append("Skill-Up AI")
 pages.append("Meal Planner")
 pages.append("Profile")
 
-page = st.sidebar.radio("Go to", pages)
+# Maintain navigation state across interactions
+if "page" not in st.session_state:
+    st.session_state.page = "Home"
+
+selected_page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page))
+st.session_state.page = selected_page
+page = selected_page
 
 # --- PAGE CONTENT ---
 if page == "Home":
