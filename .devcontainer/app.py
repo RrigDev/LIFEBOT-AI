@@ -144,18 +144,19 @@ elif st.session_state.page == "Profile":
 
     st.altair_chart(chart, use_container_width=True)
 
-elif st.session_state.page == "Meal Planner":
-    st.header("🍽️ Nutrition & Meal Planner")
-    st.write("Here you'll find personalized meals and healthy tips. Coming soon!")
+    # Expander for other modules
+    with st.expander("Daily Companion", expanded=True):
+        st.write("You can manage your tasks, journal, and chat with your AI companion here.")
+        # You can include a summary or link to the Daily Companion page if needed.
 
-elif st.session_state.page == "Career Pathfinder":
-    st.header("💼 Career Pathfinder")
-    st.write("Explore careers based on your skills and interests. Coming soon!")
+    with st.expander("Meal Planner", expanded=True):
+        st.write("Here you'll find personalized meals and healthy tips. Coming soon!")
 
-elif st.session_state.page == "Managing Finances":
-    st.header("💰 Managing Finances")
-    st.write("Financial planning tools and tips. Coming soon!")
+    with st.expander("Career Pathfinder", expanded=True):
+        st.write("Explore careers based on your skills and interests. Coming soon!")
 
-elif st.session_state.page == "Skill-Up AI":
-    st.header("📚 Skill-Up AI")
-    st.write("Learn anything, your way! Coming soon!")
+    with st.expander("Managing Finances", expanded=True):
+        st.write("Financial planning tools and tips. Coming soon!")
+
+    with st.expander("Skill-Up AI", expanded=True):
+        st.write("Learn anything, your way! Coming soon!")
