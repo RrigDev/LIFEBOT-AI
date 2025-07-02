@@ -13,8 +13,7 @@ if 'expanders_state' not in st.session_state:
         'Meal Planner': True,
         'Career Pathfinder': True,
         'Managing Finances': True,
-        'Skill-Up AI': True,
-        'Profile': True
+        'Skill-Up AI': True
     }
 
 if "page" not in st.session_state:
@@ -24,7 +23,7 @@ if "page" not in st.session_state:
 st.sidebar.title("🧭 LifeBot AI Menu")
 user_type = st.sidebar.radio("Who are you?", ["Student", "Adult", "Senior Citizen"], horizontal=True)
 
-pages = ["Home", "Daily Companion"]
+pages = ["Home"]
 if user_type == "Student":
     pages.append("Career Pathfinder")
 elif user_type in ["Adult", "Senior Citizen"]:
@@ -102,7 +101,30 @@ def render_daily_companion():
                 st.rerun()
 
     with tabs[1]:
-        st.text_area("Write your thoughts here:")
+        JOURNAL_FILE = "journal.csv"
+        if os.path.exists(JOURNAL_FILE):
+            journal = pd.read_csv(JOURNAL_FILE)
+        else:
+            journal = pd.DataFrame(columns=["Date", "Entry"])
+
+        selected_date = st.date_input("Select Date for Journal")
+        entry = ""
+        if selected_date.strftime("%Y-%m-%d") in journal["Date"].values:
+            entry = journal.loc[journal["Date"] == selected_date.strftime("%Y-%m-%d"), "Entry"].values[0]
+
+        new_entry = st.text_area("📝 Journal Entry", value=entry, height=200)
+        if st.button("💾 Save Entry"):
+            journal = journal[journal["Date"] != selected_date.strftime("%Y-%m-%d")]
+            new_row = pd.DataFrame([{"Date": selected_date.strftime("%Y-%m-%d"), "Entry": new_entry}])
+            journal = pd.concat([journal, new_row], ignore_index=True)
+            journal.to_csv(JOURNAL_FILE, index=False)
+            st.success("Entry saved successfully!")
+
+        st.markdown("---")
+        st.subheader("🗓️ Journal History")
+        for _, row in journal.sort_values("Date", ascending=False).iterrows():
+            with st.expander(f"{row['Date']} - {len(row['Entry'].split())} words"):
+                st.write(row['Entry'])
 
     with tabs[2]:
         st.write("Coming soon: Chat with your AI companion!")
@@ -147,7 +169,7 @@ if st.session_state.page == "Home":
 # Render all modules in expanders that maintain their state
 with st.expander("🧠 Daily Companion", expanded=st.session_state.expanders_state['Daily Companion']):
     render_daily_companion()
-    st.session_state.expanders_state['Daily Companion'] = True
+    st.session_state.expanders_state['Daily Companion'] = True  # Keep track that it was rendered
 
 if user_type == "Student":
     with st.expander("💼 Career Pathfinder", expanded=st.session_state.expanders_state['Career Pathfinder']):
@@ -171,9 +193,9 @@ with st.expander("🍽️ Meal Planner", expanded=st.session_state.expanders_sta
     st.write("Here you'll find personalized meals and healthy tips. Coming soon!")
     st.session_state.expanders_state['Meal Planner'] = True
 
-with st.expander("👤 Profile", expanded=st.session_state.expanders_state['Profile']):
+# Profile section
+if st.session_state.page == "Profile":
     render_profile()
-    st.session_state.expanders_state['Profile'] = True
 
 # Add toggle buttons to control module visibility in the sidebar
 with st.sidebar:
