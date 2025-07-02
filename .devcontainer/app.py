@@ -13,22 +13,15 @@ if 'expanders_state' not in st.session_state:
         'Meal Planner': True,
         'Career Pathfinder': True,
         'Managing Finances': True,
-        'Skill-Up AI': True
+        'Skill-Up AI': True,
+        'Profile': True
     }
 
 if "page" not in st.session_state:
     st.session_state.page = "Home"
 
-if "show_profile" not in st.session_state:
-    st.session_state.show_profile = False
-
 # --- Sidebar Navigation ---
 st.sidebar.title("🧭 LifeBot AI Menu")
-
-# Profile toggle button (doesn't change page)
-if st.sidebar.button("👤 Go to Profile"):
-    st.session_state.show_profile = not st.session_state.show_profile
-
 user_type = st.sidebar.radio("Who are you?", ["Student", "Adult", "Senior Citizen"], horizontal=True)
 
 pages = ["Home", "Daily Companion"]
@@ -38,11 +31,12 @@ elif user_type in ["Adult", "Senior Citizen"]:
     pages.append("Managing Finances")
 pages.extend(["Skill-Up AI", "Meal Planner"])
 
-# Page selection logic
+# Store previous page for comparison
 previous_page = st.session_state.get('current_page', 'Home')
 st.session_state.current_page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page))
 current_page = st.session_state.current_page
 
+# Only update the main page if navigation changed
 if previous_page != current_page:
     st.session_state.page = current_page
 
@@ -177,9 +171,9 @@ with st.expander("🍽️ Meal Planner", expanded=st.session_state.expanders_sta
     st.write("Here you'll find personalized meals and healthy tips. Coming soon!")
     st.session_state.expanders_state['Meal Planner'] = True
 
-# Render Profile overlay if toggled
-if st.session_state.show_profile:
+with st.expander("👤 Profile", expanded=st.session_state.expanders_state['Profile']):
     render_profile()
+    st.session_state.expanders_state['Profile'] = True
 
 # Add toggle buttons to control module visibility in the sidebar
 with st.sidebar:
