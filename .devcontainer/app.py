@@ -19,26 +19,30 @@ if 'expanders_state' not in st.session_state:
 if "page" not in st.session_state:
     st.session_state.page = "Home"
 
+if "show_profile" not in st.session_state:
+    st.session_state.show_profile = False
+
 # --- Sidebar Navigation ---
 st.sidebar.title("🧭 LifeBot AI Menu")
+
+# Profile toggle button (doesn't change page)
 if st.sidebar.button("👤 Go to Profile"):
-    st.session_state.page = "Profile"
+    st.session_state.show_profile = not st.session_state.show_profile
 
 user_type = st.sidebar.radio("Who are you?", ["Student", "Adult", "Senior Citizen"], horizontal=True)
 
-pages = ["Home", "Daily Companion", "Profile"]
+pages = ["Home", "Daily Companion"]
 if user_type == "Student":
     pages.append("Career Pathfinder")
 elif user_type in ["Adult", "Senior Citizen"]:
     pages.append("Managing Finances")
 pages.extend(["Skill-Up AI", "Meal Planner"])
 
-# Store previous page for comparison
+# Page selection logic
 previous_page = st.session_state.get('current_page', 'Home')
 st.session_state.current_page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page))
 current_page = st.session_state.current_page
 
-# Only update the main page if navigation changed
 if previous_page != current_page:
     st.session_state.page = current_page
 
@@ -79,21 +83,6 @@ def render_daily_companion():
             st.markdown(f"✅ **{done_count} of {total} tasks completed**")
         else:
             st.info("No tasks added yet!")
-
-        today_str = pd.Timestamp.today().strftime("%Y-%m-%d")
-        history_file = "task_history.csv"
-        if os.path.exists(history_file):
-            history = pd.read_csv(history_file)
-        else:
-            history = pd.DataFrame(columns=["Date", "Completed"])
-
-        if today_str in history["Date"].values:
-            history.loc[history["Date"] == today_str, "Completed"] = done_count
-        else:
-            new_row = pd.DataFrame([{"Date": today_str, "Completed": done_count}])
-            history = pd.concat([history, new_row], ignore_index=True)
-
-        history.to_csv(history_file, index=False)
 
         tasks_sorted = tasks.sort_values(by=["Done", "Due Date"])
         for i, row in tasks_sorted.iterrows():
@@ -188,9 +177,11 @@ with st.expander("🍽️ Meal Planner", expanded=st.session_state.expanders_sta
     st.write("Here you'll find personalized meals and healthy tips. Coming soon!")
     st.session_state.expanders_state['Meal Planner'] = True
 
-if st.session_state.page == "Profile":
+# Render Profile overlay if toggled
+if st.session_state.show_profile:
     render_profile()
 
+# Add toggle buttons to control module visibility in the sidebar
 with st.sidebar:
     st.markdown("---")
     st.markdown("**Module Visibility**")
