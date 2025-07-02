@@ -107,6 +107,12 @@ def render_daily_companion():
         st.write("Coming soon: Chat with your AI companion!")
 
 def render_profile():
+   def render_module_expander(module_key, title, render_func=None):
+    with st.expander(title, expanded=st.session_state.expanders_state[module_key]):
+        if st.session_state.page != "Profile" and render_func:
+            render_func()
+        st.session_state.expanders_state[module_key] = True
+
     st.header("👤 Your Profile")
     HISTORY_FILE = "task_history.csv"
     today_str = pd.Timestamp.today().strftime("%Y-%m-%d")
