@@ -39,7 +39,14 @@ current_page = st.session_state.current_page
 if previous_page != current_page:
     st.session_state.page = current_page
 
-# --- Main Content Area ---
+# --- Helper Function to Render Expanders ---
+def render_module_expander(module_key, title, render_func=None):
+    with st.expander(title, expanded=st.session_state.expanders_state[module_key]):
+        if st.session_state.page != "Profile" and render_func:
+            render_func()
+        st.session_state.expanders_state[module_key] = True
+
+# --- Daily Companion Module ---
 def render_daily_companion():
     st.header("🧠 Daily Companion")
     tabs = st.tabs(["📋 Tasks", "📓 Journal", "💬 Companion"])
@@ -106,13 +113,8 @@ def render_daily_companion():
     with tabs[2]:
         st.write("Coming soon: Chat with your AI companion!")
 
+# --- Profile Section ---
 def render_profile():
-   def render_module_expander(module_key, title, render_func=None):
-    with st.expander(title, expanded=st.session_state.expanders_state[module_key]):
-        if st.session_state.page != "Profile" and render_func:
-            render_func()
-        st.session_state.expanders_state[module_key] = True
-
     st.header("👤 Your Profile")
     HISTORY_FILE = "task_history.csv"
     today_str = pd.Timestamp.today().strftime("%Y-%m-%d")
@@ -142,45 +144,41 @@ def render_profile():
     ).properties(width=700, height=300)
     st.altair_chart(chart, use_container_width=True)
 
-# --- Page Rendering Logic ---
+# --- Main Content Rendering ---
 if st.session_state.page == "Home":
     st.title("🤖 LifeBot AI")
     st.write("Welcome! I'm your all-in-one AI assistant.")
     st.markdown("---")
     st.subheader("Choose a tool from the left menu to begin.")
 
-# Render all modules in expanders that maintain their state
-with st.expander("🧠 Daily Companion", expanded=st.session_state.expanders_state['Daily Companion']):
-    render_daily_companion()
-    st.session_state.expanders_state['Daily Companion'] = True  # Keep track that it was rendered
+render_module_expander("Daily Companion", "🧠 Daily Companion", render_daily_companion)
 
 if user_type == "Student":
-    with st.expander("💼 Career Pathfinder", expanded=st.session_state.expanders_state['Career Pathfinder']):
-        st.header("💼 Career Pathfinder")
+    render_module_expander("Career Pathfinder", "💼 Career Pathfinder", lambda: (
+        st.header("💼 Career Pathfinder"),
         st.write("Explore careers based on your skills and interests. Coming soon!")
-        st.session_state.expanders_state['Career Pathfinder'] = True
+    ))
 
 if user_type in ["Adult", "Senior Citizen"]:
-    with st.expander("💰 Managing Finances", expanded=st.session_state.expanders_state['Managing Finances']):
-        st.header("💰 Managing Finances")
+    render_module_expander("Managing Finances", "💰 Managing Finances", lambda: (
+        st.header("💰 Managing Finances"),
         st.write("Financial planning tools and tips. Coming soon!")
-        st.session_state.expanders_state['Managing Finances'] = True
+    ))
 
-with st.expander("📚 Skill-Up AI", expanded=st.session_state.expanders_state['Skill-Up AI']):
-    st.header("📚 Skill-Up AI")
+render_module_expander("Skill-Up AI", "📚 Skill-Up AI", lambda: (
+    st.header("📚 Skill-Up AI"),
     st.write("Learn anything, your way! Coming soon!")
-    st.session_state.expanders_state['Skill-Up AI'] = True
+))
 
-with st.expander("🍽️ Meal Planner", expanded=st.session_state.expanders_state['Meal Planner']):
-    st.header("🍽️ Nutrition & Meal Planner")
+render_module_expander("Meal Planner", "🍽️ Meal Planner", lambda: (
+    st.header("🍽️ Nutrition & Meal Planner"),
     st.write("Here you'll find personalized meals and healthy tips. Coming soon!")
-    st.session_state.expanders_state['Meal Planner'] = True
+))
 
-# Profile section is special - we want it to show when selected but not interfere with others
 if st.session_state.page == "Profile":
     render_profile()
 
-# Add toggle buttons to control module visibility in the sidebar
+# --- Module Visibility Toggles ---
 with st.sidebar:
     st.markdown("---")
     st.markdown("**Module Visibility**")
