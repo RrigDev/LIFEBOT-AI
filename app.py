@@ -23,21 +23,14 @@ if "page" not in st.session_state:
 st.sidebar.title("🧭 LifeBot AI Menu")
 user_type = st.sidebar.radio("Who are you?", ["Student", "Adult", "Senior Citizen"], horizontal=True)
 
-pages = ["Home", "Daily Companion"]
+pages = ["Home", "Profile", "Daily Companion"]
 if user_type == "Student":
     pages.append("Career Pathfinder")
 elif user_type in ["Adult", "Senior Citizen"]:
     pages.append("Managing Finances")
 pages.extend(["Skill-Up AI", "Meal Planner"])
 
-# Store previous page for comparison
-previous_page = st.session_state.get('current_page', 'Home')
-st.session_state.current_page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page))
-current_page = st.session_state.current_page
-
-# Only update the main page if navigation changed
-if previous_page != current_page:
-    st.session_state.page = current_page
+st.session_state.page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page))
 
 # --- Main Content Area ---
 def render_daily_companion():
@@ -106,36 +99,61 @@ def render_daily_companion():
     with tabs[2]:
         st.write("Coming soon: Chat with your AI companion!")
 
+def render_profile():
+    st.header("👤 Your Profile")
+    HISTORY_FILE = "task_history.csv"
+    today_str = pd.Timestamp.today().strftime("%Y-%m-%d")
+
+    if os.path.exists("tasks.csv"):
+        tasks = pd.read_csv("tasks.csv")
+    else:
+        tasks = pd.DataFrame(columns=["Task", "Done", "Completed Date"])
+
+    done_count_today = tasks[(tasks["Done"] == True) & 
+                           (pd.to_datetime(tasks["Completed Date"]).dt.strftime("%Y-%m-%d") == today_str)].shape[0]
+
+    if os.path.exists(HISTORY_FILE):
+        history = pd.read_csv(HISTORY_FILE)
+    else:
+        history = pd.DataFrame(columns=["Date", "Completed"])
+
+    if today_str not in history["Date"].values:
+        new_entry = pd.DataFrame([{"Date": today_str, "Completed": done_count_today}])
+        history = pd.concat([history, new_entry], ignore_index=True)
+        history.to_csv(HISTORY_FILE, index=False)
+
+    st.subheader("📊 Your Task Completion Over Time")
+    chart = alt.Chart(history).mark_bar(color="#0984e3").encode(
+        x="Date:T",
+        y=alt.Y("Completed:Q", title="Tasks Completed")
+    ).properties(width=700, height=300)
+    st.altair_chart(chart, use_container_width=True)
+
 # --- Page Rendering Logic ---
 if st.session_state.page == "Home":
     st.title("🤖 LifeBot AI")
-    st.write("Welcome! I'm your all-in-one AI assistant.")
+    st.write("Welcome! I'm your all-in-one AI assistant for students, professionals, and lifelong learners.")
     st.markdown("---")
-    st.subheader("Choose a tool from the left menu to begin.")
+    st.write("Choose a tool from the left menu to begin. Your progress, privacy, and productivity matter.")
 
-# Render all modules in expanders that maintain their state
-with st.expander("🧠 Daily Companion", expanded=st.session_state.expanders_state['Daily Companion']):
+elif st.session_state.page == "Profile":
+    render_profile()
+
+elif st.session_state.page == "Daily Companion":
     render_daily_companion()
-    st.session_state.expanders_state['Daily Companion'] = True
 
-if user_type == "Student":
-    with st.expander("💼 Career Pathfinder", expanded=st.session_state.expanders_state['Career Pathfinder']):
-        st.header("💼 Career Pathfinder")
-        st.write("Explore careers based on your skills and interests. Coming soon!")
-        st.session_state.expanders_state['Career Pathfinder'] = True
+elif st.session_state.page == "Career Pathfinder":
+    st.header("💼 Career Pathfinder")
+    st.write("Explore careers based on your skills and interests. Coming soon!")
 
-if user_type in ["Adult", "Senior Citizen"]:
-    with st.expander("💰 Managing Finances", expanded=st.session_state.expanders_state['Managing Finances']):
-        st.header("💰 Managing Finances")
-        st.write("Financial planning tools and tips. Coming soon!")
-        st.session_state.expanders_state['Managing Finances'] = True
+elif st.session_state.page == "Managing Finances":
+    st.header("💰 Managing Finances")
+    st.write("Financial planning tools and tips. Coming soon!")
 
-with st.expander("📚 Skill-Up AI", expanded=st.session_state.expanders_state['Skill-Up AI']):
+elif st.session_state.page == "Skill-Up AI":
     st.header("📚 Skill-Up AI")
     st.write("Learn anything, your way! Coming soon!")
-    st.session_state.expanders_state['Skill-Up AI'] = True
 
-with st.expander("🍽️ Meal Planner", expanded=st.session_state.expanders_state['Meal Planner']):
+elif st.session_state.page == "Meal Planner":
     st.header("🍽️ Nutrition & Meal Planner")
     st.write("Here you'll find personalized meals and healthy tips. Coming soon!")
-    st.session_state.expanders_state['Meal Planner'] = True
