@@ -1,68 +1,70 @@
 import streamlit as st
 import pandas as pd
 import os
+import altair as alt
 
-st.set_page_config(page_title="LifeBot AI Login", layout="centered")
+# Set page config
+st.set_page_config(page_title="LifeBot AI", layout="centered")
 
 # --- Constants ---
 USER_DB = "users.csv"
 
-# --- Ensure User Database Exists ---
+# --- Ensure User Database Exists and Has Correct Columns ---
 if not os.path.exists(USER_DB) or os.stat(USER_DB).st_size == 0:
-    df = pd.DataFrame(columns=["Username", "Password"])
-    df.to_csv(USER_DB, index=False)
+    users_df = pd.DataFrame(columns=["Username", "Password"])
+    users_df.to_csv(USER_DB, index=False)
+else:
+    users_df = pd.read_csv(USER_DB)
+    if "Username" not in users_df.columns or "Password" not in users_df.columns:
+        users_df = pd.DataFrame(columns=["Username", "Password"])
+        users_df.to_csv(USER_DB, index=False)
 
-# --- Load Users ---
-users_df = pd.read_csv(USER_DB)
-
-# --- Page State ---
+# Initialize session state
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
-if "current_user" not in st.session_state:
-    st.session_state.current_user = ""
+if "username" not in st.session_state:
+    st.session_state.username = ""
 
-# --- App Logic ---
-st.title("🔐 LifeBot AI Login System")
+# --- Authentication ---
+st.sidebar.title("🔐 Login / Sign Up")
+auth_mode = st.sidebar.radio("Select Mode", ["Login", "Sign Up"])
 
-menu = st.radio("Select an option", ["Login", "Sign Up"])
-
-if menu == "Login":
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-
-    if st.button("Login"):
-        if username in users_df["Username"].values:
-            user_row = users_df[users_df["Username"] == username]
-            if user_row["Password"].values[0] == password:
-                st.success(f"Welcome back, {username}!")
-                st.session_state.logged_in = True
-                st.session_state.current_user = username
+if auth_mode == "Sign Up":
+    new_user = st.sidebar.text_input("New Username")
+    new_pass = st.sidebar.text_input("New Password", type="password")
+    if st.sidebar.button("Create Account"):
+        if new_user and new_pass:
+            if new_user in users_df["Username"].values:
+                st.sidebar.warning("Username already exists!")
             else:
-                st.error("Incorrect password.")
+                users_df = users_df.append({"Username": new_user, "Password": new_pass}, ignore_index=True)
+                users_df.to_csv(USER_DB, index=False)
+                st.sidebar.success("Account created! Please log in.")
         else:
-            st.error("Username not found.")
+            st.sidebar.warning("Please enter both username and password.")
 
-elif menu == "Sign Up":
-    new_user = st.text_input("Choose a Username")
-    new_pass = st.text_input("Choose a Password", type="password")
-
-    if st.button("Sign Up"):
-        if new_user in users_df["Username"].values:
-            st.warning("Username already exists. Try logging in.")
+elif auth_mode == "Login":
+    username = st.sidebar.text_input("Username")
+    password = st.sidebar.text_input("Password", type="password")
+    if st.sidebar.button("Login"):
+        if username in users_df["Username"].values:
+            stored_password = users_df[users_df["Username"] == username]["Password"].values[0]
+            if password == stored_password:
+                st.session_state.logged_in = True
+                st.session_state.username = username
+                st.sidebar.success(f"Welcome back, {username}!")
+            else:
+                st.sidebar.error("Incorrect password.")
         else:
-            new_row = pd.DataFrame([{"Username": new_user, "Password": new_pass}])
-            users_df = pd.concat([users_df, new_row], ignore_index=True)
-            users_df.to_csv(USER_DB, index=False)
-            st.success("Account created! You can now log in.")
+            st.sidebar.error("Username not found.")
 
-# --- Logged In View ---
+# --- App Launch ---
 if st.session_state.logged_in:
-    st.markdown("---")
-    st.subheader(f"🎉 You are logged in as **{st.session_state.current_user}**")
-    if st.button("Logout"):
-        st.session_state.logged_in = False
-        st.session_state.current_user = ""
-        st.experimental_rerun()
+    st.title("Welcome to LifeBot AI")
+    st.write(f"You are logged in as **{st.session_state.username}**.")
+    # From here, render your full app interface
+else:
+    st.warning("Please log in or sign up to access LifeBot AI.")
 
 
 # --- Continue only if logged in ---
