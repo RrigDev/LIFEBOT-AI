@@ -3,6 +3,36 @@ import pandas as pd
 import os
 import altair as alt
 
+# --- Authentication Setup ---
+USERS_FILE = "users.csv"
+os.makedirs("user_tasks", exist_ok=True)
+os.makedirs("user_history", exist_ok=True)
+os.makedirs("user_journals", exist_ok=True)
+
+if not os.path.exists(USERS_FILE):
+    pd.DataFrame(columns=["username", "password"]).to_csv(USERS_FILE, index=False)
+
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+    st.session_state.username = ""
+
+if not st.session_state.logged_in:
+    st.title("🔐 Login to LifeBot AI")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+    login_btn = st.button("Login")
+
+    if login_btn:
+        users = pd.read_csv(USERS_FILE)
+        match = users[(users["username"] == username) & (users["password"] == password)]
+        if not match.empty:
+            st.session_state.logged_in = True
+            st.session_state.username = username
+            st.experimental_rerun()
+        else:
+            st.error("Invalid credentials.")
+    st.stop()
+
 # Set page config
 st.set_page_config(page_title="LifeBot AI", layout="centered")
 
@@ -30,7 +60,12 @@ elif user_type in ["Adult", "Senior Citizen"]:
     pages.append("Managing Finances")
 pages.extend(["Skill-Up AI", "Meal Planner"])
 
-st.session_state.page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page))
+previous_page = st.session_state.get('current_page', 'Home')
+st.session_state.current_page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page))
+current_page = st.session_state.current_page
+
+if previous_page != current_page:
+    st.session_state.page = current_page
 
 # --- Main Content Area ---
 def render_daily_companion():
@@ -38,7 +73,7 @@ def render_daily_companion():
     tabs = st.tabs(["📋 Tasks", "📓 Journal", "💬 Companion"])
 
     with tabs[0]:
-        TASK_FILE = "tasks.csv"
+        TASK_FILE = f"user_tasks/{st.session_state.username}_tasks.csv"
         if os.path.exists(TASK_FILE):
             tasks = pd.read_csv(TASK_FILE)
         else:
@@ -75,7 +110,7 @@ def render_daily_companion():
             col1, col2, col3 = st.columns([0.5, 0.3, 0.2])
             with col1:
                 done = st.checkbox(f"{row['Task']} [{row['Category']}] (Due: {row['Due Date']})", 
-                                 value=row["Done"], key=f"done_{i}")
+                                   value=row["Done"], key=f"done_{i}")
             with col3:
                 delete = st.button("🗑️", key=f"del_{i}")
 
@@ -101,11 +136,12 @@ def render_daily_companion():
 
 def render_profile():
     st.header("👤 Your Profile")
-    HISTORY_FILE = "task_history.csv"
+    HISTORY_FILE = f"user_history/{st.session_state.username}_history.csv"
     today_str = pd.Timestamp.today().strftime("%Y-%m-%d")
 
-    if os.path.exists("tasks.csv"):
-        tasks = pd.read_csv("tasks.csv")
+    TASK_FILE = f"user_tasks/{st.session_state.username}_tasks.csv"
+    if os.path.exists(TASK_FILE):
+        tasks = pd.read_csv(TASK_FILE)
     else:
         tasks = pd.DataFrame(columns=["Task", "Done", "Completed Date"])
 
@@ -132,28 +168,28 @@ def render_profile():
 # --- Page Rendering Logic ---
 if st.session_state.page == "Home":
     st.title("🤖 LifeBot AI")
-    st.write("Welcome! I'm your all-in-one AI assistant for students, professionals, and lifelong learners.")
+    st.write(f"Welcome, {st.session_state.username}! I'm your all-in-one AI assistant.")
     st.markdown("---")
-    st.write("Choose a tool from the left menu to begin. Your progress, privacy, and productivity matter.")
+    st.subheader("Choose a tool from the left menu to begin.")
 
-elif st.session_state.page == "Profile":
+if st.session_state.page == "Profile":
     render_profile()
 
-elif st.session_state.page == "Daily Companion":
+if st.session_state.page == "Daily Companion":
     render_daily_companion()
 
-elif st.session_state.page == "Career Pathfinder":
+if st.session_state.page == "Career Pathfinder":
     st.header("💼 Career Pathfinder")
     st.write("Explore careers based on your skills and interests. Coming soon!")
 
-elif st.session_state.page == "Managing Finances":
+if st.session_state.page == "Managing Finances":
     st.header("💰 Managing Finances")
     st.write("Financial planning tools and tips. Coming soon!")
 
-elif st.session_state.page == "Skill-Up AI":
+if st.session_state.page == "Skill-Up AI":
     st.header("📚 Skill-Up AI")
     st.write("Learn anything, your way! Coming soon!")
 
-elif st.session_state.page == "Meal Planner":
+if st.session_state.page == "Meal Planner":
     st.header("🍽️ Nutrition & Meal Planner")
     st.write("Here you'll find personalized meals and healthy tips. Coming soon!")
