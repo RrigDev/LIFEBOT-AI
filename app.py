@@ -2,61 +2,67 @@ import streamlit as st
 import pandas as pd
 import os
 
-# Path to user database
+st.set_page_config(page_title="LifeBot AI Login", layout="centered")
+
+# --- Constants ---
 USER_DB = "users.csv"
 
-# --- Ensure CSV exists and has proper columns ---
+# --- Ensure User Database Exists ---
 if not os.path.exists(USER_DB) or os.stat(USER_DB).st_size == 0:
-    pd.DataFrame(columns=["Username", "Password"]).to_csv(USER_DB, index=False)
+    df = pd.DataFrame(columns=["Username", "Password"])
+    df.to_csv(USER_DB, index=False)
 
-# Load user database
+# --- Load Users ---
 users_df = pd.read_csv(USER_DB)
 
-# Initialize session state
+# --- Page State ---
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
-    st.session_state.username = ""
+if "current_user" not in st.session_state:
+    st.session_state.current_user = ""
 
-st.title("🔐 Welcome to LifeBot AI")
+# --- App Logic ---
+st.title("🔐 LifeBot AI Login System")
 
-# --- Sign Up ---
-with st.expander("Don't have an account? Sign Up here"):
-    new_user = st.text_input("👤 New Username")
-    new_pass = st.text_input("🔑 New Password", type="password")
+menu = st.radio("Select an option", ["Login", "Sign Up"])
+
+if menu == "Login":
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+
+    if st.button("Login"):
+        if username in users_df["Username"].values:
+            user_row = users_df[users_df["Username"] == username]
+            if user_row["Password"].values[0] == password:
+                st.success(f"Welcome back, {username}!")
+                st.session_state.logged_in = True
+                st.session_state.current_user = username
+            else:
+                st.error("Incorrect password.")
+        else:
+            st.error("Username not found.")
+
+elif menu == "Sign Up":
+    new_user = st.text_input("Choose a Username")
+    new_pass = st.text_input("Choose a Password", type="password")
+
     if st.button("Sign Up"):
-        if new_user == "" or new_pass == "":
-            st.warning("Please fill in both username and password.")
-        elif new_user in users_df["Username"].values:
-            st.warning("Username already exists.")
+        if new_user in users_df["Username"].values:
+            st.warning("Username already exists. Try logging in.")
         else:
-            new_entry = pd.DataFrame([{"Username": new_user, "Password": new_pass}])
-            new_entry.to_csv(USER_DB, mode="a", header=False, index=False)
-            st.success("Account created! Please log in.")
+            new_row = pd.DataFrame([{"Username": new_user, "Password": new_pass}])
+            users_df = pd.concat([users_df, new_row], ignore_index=True)
+            users_df.to_csv(USER_DB, index=False)
+            st.success("Account created! You can now log in.")
 
-# --- Log In ---
-if not st.session_state.logged_in:
-    st.subheader("Login")
-    username = st.text_input("👤 Username")
-    password = st.text_input("🔑 Password", type="password")
-    if st.button("Log In"):
-        user_match = users_df[
-            (users_df["Username"] == username) & (users_df["Password"] == password)
-        ]
-        if not user_match.empty:
-            st.session_state.logged_in = True
-            st.session_state.username = username
-            st.success(f"Welcome, {username}!")
-            st.rerun()
-        else:
-            st.error("Invalid credentials. Try again.")
-
-# --- Protected App Content ---
+# --- Logged In View ---
 if st.session_state.logged_in:
     st.markdown("---")
-    st.subheader(f"🎉 Hello {st.session_state.username}, you're logged in!")
-
-    # Here you can continue to render the rest of your app (e.g., navigation, modules, etc.)
-    st.write("🔧 Your personalized modules will appear here...")
+    st.subheader(f"🎉 You are logged in as **{st.session_state.current_user}**")
+    if st.button("Logout"):
+        st.session_state.logged_in = False
+        st.session_state.current_user = ""
+        st.experimental_rerun()
 
 
 # --- Continue only if logged in ---
