@@ -23,7 +23,7 @@ if "page" not in st.session_state:
 st.sidebar.title("🧭 LifeBot AI Menu")
 user_type = st.sidebar.radio("Who are you?", ["Student", "Adult", "Senior Citizen"], horizontal=True)
 
-pages = ["Home"]
+pages = ["Home", "Daily Companion"]
 if user_type == "Student":
     pages.append("Career Pathfinder")
 elif user_type in ["Adult", "Senior Citizen"]:
@@ -101,63 +101,10 @@ def render_daily_companion():
                 st.rerun()
 
     with tabs[1]:
-        JOURNAL_FILE = "journal.csv"
-        if os.path.exists(JOURNAL_FILE):
-            journal = pd.read_csv(JOURNAL_FILE)
-        else:
-            journal = pd.DataFrame(columns=["Date", "Entry"])
-
-        selected_date = st.date_input("Select Date for Journal")
-        entry = ""
-        if selected_date.strftime("%Y-%m-%d") in journal["Date"].values:
-            entry = journal.loc[journal["Date"] == selected_date.strftime("%Y-%m-%d"), "Entry"].values[0]
-
-        new_entry = st.text_area("📝 Journal Entry", value=entry, height=200)
-        if st.button("💾 Save Entry"):
-            journal = journal[journal["Date"] != selected_date.strftime("%Y-%m-%d")]
-            new_row = pd.DataFrame([{"Date": selected_date.strftime("%Y-%m-%d"), "Entry": new_entry}])
-            journal = pd.concat([journal, new_row], ignore_index=True)
-            journal.to_csv(JOURNAL_FILE, index=False)
-            st.success("Entry saved successfully!")
-
-        st.markdown("---")
-        st.subheader("🗓️ Journal History")
-        for _, row in journal.sort_values("Date", ascending=False).iterrows():
-            with st.expander(f"{row['Date']} - {len(row['Entry'].split())} words"):
-                st.write(row['Entry'])
+        st.text_area("Write your thoughts here:")
 
     with tabs[2]:
         st.write("Coming soon: Chat with your AI companion!")
-
-def render_profile():
-    st.header("👤 Your Profile")
-    HISTORY_FILE = "task_history.csv"
-    today_str = pd.Timestamp.today().strftime("%Y-%m-%d")
-
-    if os.path.exists("tasks.csv"):
-        tasks = pd.read_csv("tasks.csv")
-    else:
-        tasks = pd.DataFrame(columns=["Task", "Done", "Completed Date"])
-
-    done_count_today = tasks[(tasks["Done"] == True) & 
-                           (pd.to_datetime(tasks["Completed Date"]).dt.strftime("%Y-%m-%d") == today_str)].shape[0]
-
-    if os.path.exists(HISTORY_FILE):
-        history = pd.read_csv(HISTORY_FILE)
-    else:
-        history = pd.DataFrame(columns=["Date", "Completed"])
-
-    if today_str not in history["Date"].values:
-        new_entry = pd.DataFrame([{"Date": today_str, "Completed": done_count_today}])
-        history = pd.concat([history, new_entry], ignore_index=True)
-        history.to_csv(HISTORY_FILE, index=False)
-
-    st.subheader("📊 Your Task Completion Over Time")
-    chart = alt.Chart(history).mark_bar(color="#0984e3").encode(
-        x="Date:T",
-        y=alt.Y("Completed:Q", title="Tasks Completed")
-    ).properties(width=700, height=300)
-    st.altair_chart(chart, use_container_width=True)
 
 # --- Page Rendering Logic ---
 if st.session_state.page == "Home":
@@ -169,7 +116,7 @@ if st.session_state.page == "Home":
 # Render all modules in expanders that maintain their state
 with st.expander("🧠 Daily Companion", expanded=st.session_state.expanders_state['Daily Companion']):
     render_daily_companion()
-    st.session_state.expanders_state['Daily Companion'] = True  # Keep track that it was rendered
+    st.session_state.expanders_state['Daily Companion'] = True
 
 if user_type == "Student":
     with st.expander("💼 Career Pathfinder", expanded=st.session_state.expanders_state['Career Pathfinder']):
@@ -192,7 +139,3 @@ with st.expander("🍽️ Meal Planner", expanded=st.session_state.expanders_sta
     st.header("🍽️ Nutrition & Meal Planner")
     st.write("Here you'll find personalized meals and healthy tips. Coming soon!")
     st.session_state.expanders_state['Meal Planner'] = True
-
-# Profile section
-if st.session_state.page == "Profile":
-    render_profile()
