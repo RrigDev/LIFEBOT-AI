@@ -1,36 +1,59 @@
 import streamlit as st
 import pandas as pd
 import os
-import altair as alt
 
-# --- Authentication Setup ---
-USERS_FILE = "users.csv"
-os.makedirs("user_tasks", exist_ok=True)
-os.makedirs("user_history", exist_ok=True)
-os.makedirs("user_journals", exist_ok=True)
+st.set_page_config(page_title="LifeBot AI", layout="centered")
 
-if not os.path.exists(USERS_FILE):
-    pd.DataFrame(columns=["username", "password"]).to_csv(USERS_FILE, index=False)
+# Create users file and data folder if not present
+if not os.path.exists("users.csv"):
+    pd.DataFrame(columns=["Username", "Password"]).to_csv("users.csv", index=False)
+if not os.path.exists("data"):
+    os.makedirs("data")
 
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
+# Load users
+users_df = pd.read_csv("users.csv")
+
+# Session state init
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+if "username" not in st.session_state:
     st.session_state.username = ""
 
-if not st.session_state.logged_in:
-    st.title("🔐 Login to LifeBot AI")
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-    login_btn = st.button("Login")
+# Login/Sign-up Toggle
+auth_mode = st.sidebar.radio("🔐 Choose mode:", ["Login", "Sign Up"])
 
-    if login_btn:
-        users = pd.read_csv(USERS_FILE)
-        match = users[(users["username"] == username) & (users["password"] == password)]
-        if not match.empty:
-            st.session_state.logged_in = True
-            st.session_state.username = username
-            st.experimental_rerun()
+# Sign-Up Logic
+if auth_mode == "Sign Up":
+    st.sidebar.subheader("Create a New Account")
+    new_user = st.sidebar.text_input("👤 New Username")
+    new_pass = st.sidebar.text_input("🔑 New Password", type="password")
+    if st.sidebar.button("📩 Register"):
+        if new_user in users_df["Username"].values:
+            st.sidebar.error("Username already exists!")
+        elif not new_user or not new_pass:
+            st.sidebar.error("Username and Password required!")
         else:
-            st.error("Invalid credentials.")
+            users_df = users_df.append({"Username": new_user, "Password": new_pass}, ignore_index=True)
+            users_df.to_csv("users.csv", index=False)
+            pd.DataFrame(columns=["Task", "Done", "Due Date", "Category", "Completed Date"]).to_csv(f"data/{new_user}_tasks.csv", index=False)
+            pd.DataFrame(columns=["Date", "Completed"]).to_csv(f"data/{new_user}_history.csv", index=False)
+            st.sidebar.success("Account created! Please log in.")
+
+# Login Logic
+if auth_mode == "Login":
+    st.sidebar.subheader("Login to LifeBot")
+    username = st.sidebar.text_input("👤 Username")
+    password = st.sidebar.text_input("🔒 Password", type="password")
+    if st.sidebar.button("✅ Login"):
+        if ((users_df["Username"] == username) & (users_df["Password"] == password)).any():
+            st.session_state.authenticated = True
+            st.session_state.username = username
+            st.sidebar.success(f"Welcome back, {username}!")
+        else:
+            st.sidebar.error("Invalid username or password!")
+
+# Stop page if not authenticated
+if not st.session_state.authenticated:
     st.stop()
 
 # Set page config
