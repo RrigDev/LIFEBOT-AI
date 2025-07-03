@@ -196,14 +196,3 @@ with st.expander("🍽️ Meal Planner", expanded=st.session_state.expanders_sta
 # Profile section
 if st.session_state.page == "Profile":
     render_profile()
-
-# Add toggle buttons to control module visibility in the sidebar
-with st.sidebar:
-    st.markdown("---")
-    st.markdown("**Module Visibility**")
-    for module in st.session_state.expanders_state:
-        st.session_state.expanders_state[module] = st.checkbox(
-            f"Show {module}",
-            value=st.session_state.expanders_state[module],
-            key=f"show_{module}"
-        )
