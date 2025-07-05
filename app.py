@@ -19,45 +19,76 @@ else:
         users_df = pd.DataFrame(columns=["Username"])
         users_df.to_csv(USER_DB, index=False)
 
-# Initialize session state
+# --- Session State Initialization ---
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "username" not in st.session_state:
     st.session_state.username = ""
+if "page" not in st.session_state:
+    st.session_state.page = "Home"
 
-# --- Authentication UI ---
+# --- Login via Name Input ---
 st.sidebar.title("👤 Welcome")
 name_input = st.sidebar.text_input("Enter your name")
-
-if st.sidebar.button("Hello, " + name_input.strip().capitalize() + "!"):
-    clean_name = name_input.strip().lower()
-    if clean_name:
+if st.sidebar.button(f"Hello, {name_input.title()}!"):
+    if name_input:
+        username = name_input.strip().lower()
+        st.session_state.username = username
         st.session_state.logged_in = True
-        st.session_state.username = clean_name
-        if clean_name.capitalize() not in users_df["Username"].str.lower().values:
-            users_df = pd.concat([users_df, pd.DataFrame([[clean_name.capitalize()]], columns=["Username"])], ignore_index=True)
+        # Add to database if new
+        if username not in users_df["Username"].str.lower().values:
+            users_df = pd.concat([users_df, pd.DataFrame([{"Username": username}])], ignore_index=True)
             users_df.to_csv(USER_DB, index=False)
+        st.rerun()
 
-# --- Main App Logic ---
-def render_main_app():
-    st.title("Welcome to LifeBot AI")
-    st.write(f"You are logged in as **{st.session_state.username}**.")
-
-    # Example content: add your full app logic here
-    st.header("🧠 Daily Companion")
-    st.write("This will include tasks, journaling, and more for the user.")
-
-    st.header("📓 Journal")
-    st.write("Here you'll write your thoughts. Save & refer to older notes.")
-
-    st.header("📊 Progress Tracker")
-    st.write("Charts and analytics go here.")
-
-# --- Launch App ---
+# --- App Content ---
 if st.session_state.logged_in:
-    render_main_app()
+    st.sidebar.title("🧭 LifeBot AI Menu")
+    user_type = st.sidebar.radio("Who are you?", ["Student", "Adult", "Senior Citizen"], horizontal=False)
+
+    pages = ["Home", "Daily Companion", "Progress Tracker"]
+    if user_type == "Student":
+        pages.append("Career Pathfinder")
+    elif user_type in ["Adult", "Senior Citizen"]:
+        pages.append("Managing Finances")
+    pages.append("Skill-Up AI")
+    pages.append("Meal Planner")
+
+    selected_page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page))
+    st.session_state.page = selected_page
+
+    # --- Page Rendering ---
+    if st.session_state.page == "Home":
+        st.title("Welcome to LifeBot AI")
+        st.write(f"You are logged in as **{st.session_state.username}**.")
+
+    elif st.session_state.page == "Daily Companion":
+        st.title("🧠 Daily Companion")
+        st.write("Your journal, tasks, and notes go here.")
+
+    elif st.session_state.page == "Progress Tracker":
+        st.title("📊 Progress Tracker")
+        st.write("Charts and analytics go here.")
+
+    elif st.session_state.page == "Career Pathfinder":
+        st.title("💼 Career Pathfinder")
+        st.write("Explore careers based on your skills and interests. Coming soon!")
+
+    elif st.session_state.page == "Managing Finances":
+        st.title("💰 Managing Finances")
+        st.write("Financial planning tools and tips. Coming soon!")
+
+    elif st.session_state.page == "Skill-Up AI":
+        st.title("📚 Skill-Up AI")
+        st.write("Learn anything, your way! Coming soon!")
+
+    elif st.session_state.page == "Meal Planner":
+        st.title("🍽️ Meal Planner")
+        st.write("Personalized meals and healthy tips. Coming soon!")
+
 else:
-    st.warning("Please enter your name to access LifeBot AI.")
+    st.title("Welcome to LifeBot AI")
+    st.info("Please enter your name in the sidebar to get started.")
 
 
 # --- Continue only if logged in ---
