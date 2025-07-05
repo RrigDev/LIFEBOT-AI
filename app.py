@@ -8,6 +8,10 @@ st.set_page_config(page_title="LifeBot AI", layout="centered")
 
 # --- Constants ---
 USER_DB = "users.csv"
+DATA_DIR = "data"
+
+# --- Ensure data directory exists ---
+os.makedirs(DATA_DIR, exist_ok=True)
 
 # --- Ensure User Database Exists and Has Correct Columns ---
 if not os.path.exists(USER_DB) or os.stat(USER_DB).st_size == 0:
@@ -37,7 +41,7 @@ if auth_mode == "Sign Up":
             if new_user in users_df["Username"].values:
                 st.sidebar.warning("Username already exists!")
             else:
-                users_df = users_df.append({"Username": new_user, "Password": new_pass}, ignore_index=True)
+                users_df.loc[len(users_df)] = {"Username": new_user, "Password": new_pass}
                 users_df.to_csv(USER_DB, index=False)
                 st.sidebar.success("Account created! Please log in.")
         else:
@@ -62,7 +66,50 @@ elif auth_mode == "Login":
 if st.session_state.logged_in:
     st.title("Welcome to LifeBot AI")
     st.write(f"You are logged in as **{st.session_state.username}**.")
-    # From here, render your full app interface
+
+    # --- Example: Load User-Specific Task File ---
+    task_file = os.path.join(DATA_DIR, f"{st.session_state.username}_tasks.csv")
+    if os.path.exists(task_file):
+        tasks = pd.read_csv(task_file)
+    else:
+        tasks = pd.DataFrame(columns=["Task", "Done", "Due Date", "Category", "Completed Date"])
+
+    st.subheader("📋 Your Tasks")
+
+    with st.form("add_task_form", clear_on_submit=True):
+        task_text = st.text_input("Task")
+        due_date = st.date_input("Due Date")
+        category = st.selectbox("Category", ["Study", "Work", "Personal", "Health", "Other"])
+        submitted = st.form_submit_button("Add Task")
+        if submitted and task_text:
+            new_row = pd.DataFrame([{
+                "Task": task_text.strip(),
+                "Done": False,
+                "Due Date": due_date,
+                "Category": category,
+                "Completed Date": pd.NaT
+            }])
+            tasks = pd.concat([tasks, new_row], ignore_index=True)
+            tasks.to_csv(task_file, index=False)
+            st.experimental_rerun()
+
+    for i, row in tasks.iterrows():
+        col1, col2 = st.columns([0.8, 0.2])
+        with col1:
+            done = st.checkbox(f"{row['Task']} (Due: {row['Due Date']})", value=row["Done"], key=f"done_{i}")
+        with col2:
+            delete = st.button("🗑️", key=f"delete_{i}")
+
+        if done != row["Done"]:
+            tasks.at[i, "Done"] = done
+            tasks.at[i, "Completed Date"] = pd.Timestamp.today().normalize() if done else pd.NaT
+            tasks.to_csv(task_file, index=False)
+            st.experimental_rerun()
+
+        if delete:
+            tasks = tasks.drop(i)
+            tasks.to_csv(task_file, index=False)
+            st.experimental_rerun()
 else:
     st.warning("Please log in or sign up to access LifeBot AI.")
 
