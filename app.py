@@ -6,39 +6,58 @@ import altair as alt
 # Set page config
 st.set_page_config(page_title="LifeBot AI", layout="centered")
 
-# --- User Identification ---
-st.sidebar.title("👤 Welcome")
-raw_username = st.sidebar.text_input("Enter your name")
+# --- Constants ---
+USER_DB = "users.csv"
 
-if raw_username:
-    username = raw_username.strip().lower()
-    st.session_state.username = username
-    st.sidebar.success(f"Hello, {raw_username.strip().capitalize()}!")
+# --- Ensure User Database Exists and Has Correct Columns ---
+if not os.path.exists(USER_DB) or os.stat(USER_DB).st_size == 0:
+    users_df = pd.DataFrame(columns=["Username"])
+    users_df.to_csv(USER_DB, index=False)
 else:
-    st.warning("Please enter your name to continue.")
-    st.stop()
+    users_df = pd.read_csv(USER_DB)
+    if "Username" not in users_df.columns:
+        users_df = pd.DataFrame(columns=["Username"])
+        users_df.to_csv(USER_DB, index=False)
 
-# --- File Paths (User-Specific) ---
-USER_DB = "users.csv"  # For potential expansion if needed later
-TASK_FILE = f"tasks_{username}.csv"
-JOURNAL_FILE = f"journal_{username}.csv"
-HISTORY_FILE = f"history_{username}.csv"
+# Initialize session state
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "username" not in st.session_state:
+    st.session_state.username = ""
 
-# --- Ensure Files Exist ---
-if not os.path.exists(TASK_FILE):
-    pd.DataFrame(columns=["Task", "Done", "Due Date", "Category", "Completed Date"]).to_csv(TASK_FILE, index=False)
+# --- Authentication UI ---
+st.sidebar.title("👤 Welcome")
+name_input = st.sidebar.text_input("Enter your name")
 
-if not os.path.exists(JOURNAL_FILE):
-    pd.DataFrame(columns=["Date", "Mood", "Entry"]).to_csv(JOURNAL_FILE, index=False)
+if st.sidebar.button("Hello, " + name_input.strip().capitalize() + "!"):
+    clean_name = name_input.strip().lower()
+    if clean_name:
+        st.session_state.logged_in = True
+        st.session_state.username = clean_name
+        if clean_name.capitalize() not in users_df["Username"].str.lower().values:
+            users_df = pd.concat([users_df, pd.DataFrame([[clean_name.capitalize()]], columns=["Username"])], ignore_index=True)
+            users_df.to_csv(USER_DB, index=False)
 
-if not os.path.exists(HISTORY_FILE):
-    pd.DataFrame(columns=["Date", "Completed"]).to_csv(HISTORY_FILE, index=False)
+# --- Main App Logic ---
+def render_main_app():
+    st.title("Welcome to LifeBot AI")
+    st.write(f"You are logged in as **{st.session_state.username}**.")
 
-# --- App Launch ---
-st.title("Welcome to LifeBot AI")
-st.write(f"You are logged in as **{username}**.")
-# From here, render your full app interface
+    # Example content: add your full app logic here
+    st.header("🧠 Daily Companion")
+    st.write("This will include tasks, journaling, and more for the user.")
 
+    st.header("📓 Journal")
+    st.write("Here you'll write your thoughts. Save & refer to older notes.")
+
+    st.header("📊 Progress Tracker")
+    st.write("Charts and analytics go here.")
+
+# --- Launch App ---
+if st.session_state.logged_in:
+    render_main_app()
+else:
+    st.warning("Please enter your name to access LifeBot AI.")
 
 
 # --- Continue only if logged in ---
