@@ -6,112 +6,39 @@ import altair as alt
 # Set page config
 st.set_page_config(page_title="LifeBot AI", layout="centered")
 
-# --- Constants ---
-USER_DB = "users.csv"
-DATA_DIR = "data"
+# --- User Identification ---
+st.sidebar.title("👤 Welcome")
+raw_username = st.sidebar.text_input("Enter your name")
 
-# --- Ensure data directory exists ---
-os.makedirs(DATA_DIR, exist_ok=True)
-
-# --- Ensure User Database Exists and Has Correct Columns ---
-if not os.path.exists(USER_DB) or os.stat(USER_DB).st_size == 0:
-    users_df = pd.DataFrame(columns=["Username", "Password"])
-    users_df.to_csv(USER_DB, index=False)
+if raw_username:
+    username = raw_username.strip().lower()
+    st.session_state.username = username
+    st.sidebar.success(f"Hello, {raw_username.strip().capitalize()}!")
 else:
-    users_df = pd.read_csv(USER_DB)
-    if "Username" not in users_df.columns or "Password" not in users_df.columns:
-        users_df = pd.DataFrame(columns=["Username", "Password"])
-        users_df.to_csv(USER_DB, index=False)
+    st.warning("Please enter your name to continue.")
+    st.stop()
 
-# Initialize session state
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "username" not in st.session_state:
-    st.session_state.username = ""
+# --- File Paths (User-Specific) ---
+USER_DB = "users.csv"  # For potential expansion if needed later
+TASK_FILE = f"tasks_{username}.csv"
+JOURNAL_FILE = f"journal_{username}.csv"
+HISTORY_FILE = f"history_{username}.csv"
 
-# --- Authentication ---
-st.sidebar.title("🔐 Login / Sign Up")
-auth_mode = st.sidebar.radio("Select Mode", ["Login", "Sign Up"])
+# --- Ensure Files Exist ---
+if not os.path.exists(TASK_FILE):
+    pd.DataFrame(columns=["Task", "Done", "Due Date", "Category", "Completed Date"]).to_csv(TASK_FILE, index=False)
 
-if auth_mode == "Sign Up":
-    new_user = st.sidebar.text_input("New Username")
-    new_pass = st.sidebar.text_input("New Password", type="password")
-    if st.sidebar.button("Create Account"):
-        if new_user and new_pass:
-            if new_user in users_df["Username"].values:
-                st.sidebar.warning("Username already exists!")
-            else:
-                users_df.loc[len(users_df)] = {"Username": new_user, "Password": new_pass}
-                users_df.to_csv(USER_DB, index=False)
-                st.sidebar.success("Account created! Please log in.")
-        else:
-            st.sidebar.warning("Please enter both username and password.")
+if not os.path.exists(JOURNAL_FILE):
+    pd.DataFrame(columns=["Date", "Mood", "Entry"]).to_csv(JOURNAL_FILE, index=False)
 
-elif auth_mode == "Login":
-    username = st.sidebar.text_input("Username")
-    password = st.sidebar.text_input("Password", type="password")
-    if st.sidebar.button("Login"):
-        if username in users_df["Username"].values:
-            stored_password = users_df[users_df["Username"] == username]["Password"].values[0]
-            if password == stored_password:
-                st.session_state.logged_in = True
-                st.session_state.username = username
-                st.sidebar.success(f"Welcome back, {username}!")
-            else:
-                st.sidebar.error("Incorrect password.")
-        else:
-            st.sidebar.error("Username not found.")
+if not os.path.exists(HISTORY_FILE):
+    pd.DataFrame(columns=["Date", "Completed"]).to_csv(HISTORY_FILE, index=False)
 
 # --- App Launch ---
-if st.session_state.logged_in:
-    st.title("Welcome to LifeBot AI")
-    st.write(f"You are logged in as **{st.session_state.username}**.")
+st.title("Welcome to LifeBot AI")
+st.write(f"You are logged in as **{username}**.")
+# From here, render your full app interface
 
-    # --- Example: Load User-Specific Task File ---
-    task_file = os.path.join(DATA_DIR, f"{st.session_state.username}_tasks.csv")
-    if os.path.exists(task_file):
-        tasks = pd.read_csv(task_file)
-    else:
-        tasks = pd.DataFrame(columns=["Task", "Done", "Due Date", "Category", "Completed Date"])
-
-    st.subheader("📋 Your Tasks")
-
-    with st.form("add_task_form", clear_on_submit=True):
-        task_text = st.text_input("Task")
-        due_date = st.date_input("Due Date")
-        category = st.selectbox("Category", ["Study", "Work", "Personal", "Health", "Other"])
-        submitted = st.form_submit_button("Add Task")
-        if submitted and task_text:
-            new_row = pd.DataFrame([{
-                "Task": task_text.strip(),
-                "Done": False,
-                "Due Date": due_date,
-                "Category": category,
-                "Completed Date": pd.NaT
-            }])
-            tasks = pd.concat([tasks, new_row], ignore_index=True)
-            tasks.to_csv(task_file, index=False)
-            st.experimental_rerun()
-
-    for i, row in tasks.iterrows():
-        col1, col2 = st.columns([0.8, 0.2])
-        with col1:
-            done = st.checkbox(f"{row['Task']} (Due: {row['Due Date']})", value=row["Done"], key=f"done_{i}")
-        with col2:
-            delete = st.button("🗑️", key=f"delete_{i}")
-
-        if done != row["Done"]:
-            tasks.at[i, "Done"] = done
-            tasks.at[i, "Completed Date"] = pd.Timestamp.today().normalize() if done else pd.NaT
-            tasks.to_csv(task_file, index=False)
-            st.experimental_rerun()
-
-        if delete:
-            tasks = tasks.drop(i)
-            tasks.to_csv(task_file, index=False)
-            st.experimental_rerun()
-else:
-    st.warning("Please log in or sign up to access LifeBot AI.")
 
 
 # --- Continue only if logged in ---
