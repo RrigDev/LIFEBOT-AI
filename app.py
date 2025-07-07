@@ -41,9 +41,8 @@ if st.sidebar.button(f"Hello, {name_input.title()}!"):
             users_df.to_csv(USER_DB, index=False)
         st.rerun()
 
-# --- Continue only if logged in ---
-if st.session_state.get("logged_in"):
-    # Sidebar Navigation
+# --- App Content ---
+if st.session_state.logged_in:
     st.sidebar.title("🧭 LifeBot AI Menu")
     user_type = st.sidebar.radio("Who are you?", ["Student", "Adult", "Senior Citizen"], horizontal=True)
 
@@ -52,17 +51,16 @@ if st.session_state.get("logged_in"):
         pages.append("Career Pathfinder")
     elif user_type in ["Adult", "Senior Citizen"]:
         pages.append("Managing Finances")
-    pages.extend(["Skill-Up AI", "Meal Planner"])
+    pages.append("Skill-Up AI")
+    pages.append("Meal Planner")
 
     selected_page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page))
     st.session_state.page = selected_page
 
-    # --- Main Page Rendering ---
+    # --- Page Rendering ---
     if st.session_state.page == "Home":
-        st.title("🤖 LifeBot AI")
-        st.write("Welcome! I'm your all-in-one AI assistant.")
-        st.markdown("---")
-        st.subheader("Choose a tool from the left menu to begin.")
+        st.title("Welcome to LifeBot AI")
+        st.write(f"You are logged in as **{st.session_state.username}**.")
 
     elif st.session_state.page == "Profile":
         st.header("👤 Your Profile")
@@ -95,7 +93,7 @@ if st.session_state.get("logged_in"):
         st.altair_chart(chart, use_container_width=True)
 
     elif st.session_state.page == "Daily Companion":
-        st.header("🧠 Daily Companion")
+        st.title("🧠 Daily Companion")
         tabs = st.tabs(["📋 Tasks", "📓 Journal", "💬 Companion"])
 
         with tabs[0]:
@@ -152,7 +150,32 @@ if st.session_state.get("logged_in"):
                     st.rerun()
 
         with tabs[1]:
-            st.text_area("Write your thoughts here:")
+            JOURNAL_FILE = f"journal_{st.session_state.username}.csv"
+            if os.path.exists(JOURNAL_FILE):
+                journal_df = pd.read_csv(JOURNAL_FILE)
+            else:
+                journal_df = pd.DataFrame(columns=["Date", "Mood", "Entry"])
+
+            with st.form("journal_form"):
+                mood = st.selectbox("🧠 Mood", ["😊 Happy", "😐 Neutral", "😞 Sad", "😠 Angry", "😌 Calm", "😕 Confused"])
+                entry = st.text_area("📝 Journal Entry")
+                submit_entry = st.form_submit_button("💾 Save Entry")
+
+                if submit_entry and entry.strip():
+                    new_entry = pd.DataFrame([{
+                        "Date": pd.Timestamp.today().strftime("%Y-%m-%d"),
+                        "Mood": mood,
+                        "Entry": entry.strip()
+                    }])
+                    journal_df = pd.concat([journal_df, new_entry], ignore_index=True)
+                    journal_df.to_csv(JOURNAL_FILE, index=False)
+                    st.success("Journal saved!")
+
+            if not journal_df.empty:
+                st.subheader("📚 Previous Entries")
+                for _, row in journal_df[::-1].iterrows():
+                    st.markdown(f"**{row['Date']}** - *{row['Mood']}*")
+                    st.info(row['Entry'])
 
         with tabs[2]:
             st.write("Coming soon: Chat with your AI companion!")
@@ -170,5 +193,9 @@ if st.session_state.get("logged_in"):
         st.write("Learn anything, your way! Coming soon!")
 
     elif st.session_state.page == "Meal Planner":
-        st.header("🍽️ Nutrition & Meal Planner")
-        st.write("Here you'll find personalized meals and healthy tips. Coming soon!")
+        st.header("🍽️ Meal Planner")
+        st.write("Personalized meals and healthy tips. Coming soon!")
+
+else:
+    st.title("Welcome to LifeBot AI")
+    st.info("Please enter your name in the sidebar to get started.")
