@@ -1,23 +1,41 @@
 import streamlit as st
 import pandas as pd
-import os
+import sqlite3
 import altair as alt
+from datetime import date
 
 # Set page config
 st.set_page_config(page_title="LifeBot AI", layout="centered")
 
-# --- Constants ---
-USER_DB = "users.csv"
+# --- Database Setup ---
+conn = sqlite3.connect("lifebot.db", check_same_thread=False)
+c = conn.cursor()
 
-# --- Ensure User Database Exists and Has Correct Columns ---
-if not os.path.exists(USER_DB) or os.stat(USER_DB).st_size == 0:
-    users_df = pd.DataFrame(columns=["Username"])
-    users_df.to_csv(USER_DB, index=False)
-else:
-    users_df = pd.read_csv(USER_DB)
-    if "Username" not in users_df.columns:
-        users_df = pd.DataFrame(columns=["Username"])
-        users_df.to_csv(USER_DB, index=False)
+# Create tables if not exist
+c.execute('''CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL
+)''')
+
+c.execute('''CREATE TABLE IF NOT EXISTS tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    task TEXT,
+    done BOOLEAN,
+    due_date TEXT,
+    category TEXT,
+    completed_date TEXT,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+)''')
+
+c.execute('''CREATE TABLE IF NOT EXISTS task_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    date TEXT,
+    completed INTEGER,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+)''')
+conn.commit()
 
 # --- Session State Initialization ---
 if "logged_in" not in st.session_state:
@@ -33,16 +51,26 @@ name_input = st.sidebar.text_input("Enter your name")
 if st.sidebar.button(f"Hello, {name_input.title()}!"):
     if name_input:
         username = name_input.strip().lower()
+        c.execute("SELECT id FROM users WHERE LOWER(username) = ?", (username,))
+        user = c.fetchone()
+        if not user:
+            c.execute("INSERT INTO users (username) VALUES (?)", (username,))
+            conn.commit()
         st.session_state.username = username
         st.session_state.logged_in = True
-        # Add to database if new
-        if username not in users_df["Username"].str.lower().values:
-            users_df = pd.concat([users_df, pd.DataFrame([{"Username": username}])], ignore_index=True)
-            users_df.to_csv(USER_DB, index=False)
         st.rerun()
 
-# --- App Content ---
-if st.session_state.logged_in:
+# --- Get Current User ID ---
+def get_user_id():
+    c.execute("SELECT id FROM users WHERE LOWER(username) = ?", (st.session_state.username,))
+    result = c.fetchone()
+    return result[0] if result else None
+
+# --- Continue only if logged in ---
+if st.session_state.get("logged_in"):
+    user_id = get_user_id()
+
+    # Sidebar Navigation
     st.sidebar.title("🧭 LifeBot AI Menu")
     user_type = st.sidebar.radio("Who are you?", ["Student", "Adult", "Senior Citizen"], horizontal=True)
 
@@ -51,58 +79,44 @@ if st.session_state.logged_in:
         pages.append("Career Pathfinder")
     elif user_type in ["Adult", "Senior Citizen"]:
         pages.append("Managing Finances")
-    pages.append("Skill-Up AI")
-    pages.append("Meal Planner")
+    pages.extend(["Skill-Up AI", "Meal Planner"])
 
     selected_page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page))
     st.session_state.page = selected_page
 
-    # --- Page Rendering ---
+    # --- Main Page Rendering ---
     if st.session_state.page == "Home":
-        st.title("Welcome to LifeBot AI")
-        st.write(f"You are logged in as **{st.session_state.username}**.")
+        st.title("🤖 LifeBot AI")
+        st.write("Welcome! I'm your all-in-one AI assistant.")
+        st.markdown("---")
+        st.subheader("Choose a tool from the left menu to begin.")
 
     elif st.session_state.page == "Profile":
         st.header("👤 Your Profile")
-        HISTORY_FILE = "task_history.csv"
-        today_str = pd.Timestamp.today().strftime("%Y-%m-%d")
+        today_str = date.today().isoformat()
 
-        if os.path.exists("tasks.csv"):
-            tasks = pd.read_csv("tasks.csv")
-        else:
-            tasks = pd.DataFrame(columns=["Task", "Done", "Completed Date"])
+        c.execute("SELECT COUNT(*) FROM tasks WHERE user_id=? AND done=1 AND DATE(completed_date)=?", (user_id, today_str))
+        done_count_today = c.fetchone()[0]
 
-        done_count_today = tasks[(tasks["Done"] == True) & 
-                               (pd.to_datetime(tasks["Completed Date"]).dt.strftime("%Y-%m-%d") == today_str)].shape[0]
+        c.execute("SELECT * FROM task_history WHERE user_id=? AND date=?", (user_id, today_str))
+        if not c.fetchone():
+            c.execute("INSERT INTO task_history (user_id, date, completed) VALUES (?, ?, ?)", (user_id, today_str, done_count_today))
+            conn.commit()
 
-        if os.path.exists(HISTORY_FILE):
-            history = pd.read_csv(HISTORY_FILE)
-        else:
-            history = pd.DataFrame(columns=["Date", "Completed"])
-
-        if today_str not in history["Date"].values:
-            new_entry = pd.DataFrame([{"Date": today_str, "Completed": done_count_today}])
-            history = pd.concat([history, new_entry], ignore_index=True)
-            history.to_csv(HISTORY_FILE, index=False)
+        history_df = pd.read_sql_query("SELECT date, completed FROM task_history WHERE user_id=?", conn, params=(user_id,))
 
         st.subheader("📊 Your Task Completion Over Time")
-        chart = alt.Chart(history).mark_bar(color="#0984e3").encode(
-            x="Date:T",
-            y=alt.Y("Completed:Q", title="Tasks Completed")
+        chart = alt.Chart(history_df).mark_bar(color="#0984e3").encode(
+            x="date:T",
+            y=alt.Y("completed:Q", title="Tasks Completed")
         ).properties(width=700, height=300)
         st.altair_chart(chart, use_container_width=True)
 
     elif st.session_state.page == "Daily Companion":
-        st.title("🧠 Daily Companion")
+        st.header("🧠 Daily Companion")
         tabs = st.tabs(["📋 Tasks", "📓 Journal", "💬 Companion"])
 
         with tabs[0]:
-            TASK_FILE = "tasks.csv"
-            if os.path.exists(TASK_FILE):
-                tasks = pd.read_csv(TASK_FILE)
-            else:
-                tasks = pd.DataFrame(columns=["Task", "Done", "Due Date", "Category", "Completed Date"])
-
             with st.form("add_task_form", clear_on_submit=True):
                 new_task = st.text_input("📝 Task")
                 due_date = st.date_input("📅 Due Date")
@@ -110,72 +124,42 @@ if st.session_state.logged_in:
                 submitted = st.form_submit_button("➕ Add Task")
 
                 if submitted and new_task.strip():
-                    new_row = pd.DataFrame([{
-                        "Task": new_task.strip(),
-                        "Done": False,
-                        "Due Date": due_date,
-                        "Category": category,
-                        "Completed Date": pd.NaT
-                    }])
-                    tasks = pd.concat([tasks, new_row], ignore_index=True)
-                    tasks.to_csv(TASK_FILE, index=False)
+                    c.execute('''INSERT INTO tasks (user_id, task, done, due_date, category, completed_date)
+                                 VALUES (?, ?, ?, ?, ?, ?)''',
+                              (user_id, new_task.strip(), False, due_date.isoformat(), category, None))
+                    conn.commit()
                     st.rerun()
 
-            total = len(tasks)
-            done_count = tasks["Done"].sum()
+            task_df = pd.read_sql_query("SELECT * FROM tasks WHERE user_id=?", conn, params=(user_id,))
+            total = len(task_df)
+            done_count = task_df["done"].sum()
             if total > 0:
                 st.progress(done_count / total)
                 st.markdown(f"✅ **{done_count} of {total} tasks completed**")
             else:
                 st.info("No tasks added yet!")
 
-            tasks_sorted = tasks.sort_values(by=["Done", "Due Date"])
-            for i, row in tasks_sorted.iterrows():
+            for _, row in task_df.sort_values(by=["done", "due_date"]).iterrows():
                 col1, col2, col3 = st.columns([0.5, 0.3, 0.2])
                 with col1:
-                    done = st.checkbox(f"{row['Task']} [{row['Category']}] (Due: {row['Due Date']})", 
-                                     value=row["Done"], key=f"done_{i}")
+                    done = st.checkbox(f"{row['task']} [{row['category']}] (Due: {row['due_date']})", 
+                                       value=row["done"], key=f"done_{row['id']}")
                 with col3:
-                    delete = st.button("🗑️", key=f"del_{i}")
+                    delete = st.button("🗑️", key=f"del_{row['id']}")
 
-                if done != row["Done"]:
-                    tasks.at[i, "Done"] = done
-                    tasks.at[i, "Completed Date"] = pd.Timestamp.today().normalize() if done else pd.NaT
-                    tasks.to_csv(TASK_FILE, index=False)
+                if done != row["done"]:
+                    completed_date = date.today().isoformat() if done else None
+                    c.execute("UPDATE tasks SET done=?, completed_date=? WHERE id=?", (done, completed_date, row['id']))
+                    conn.commit()
                     st.rerun()
 
                 if delete:
-                    tasks = tasks.drop(i)
-                    tasks.to_csv(TASK_FILE, index=False)
+                    c.execute("DELETE FROM tasks WHERE id=?", (row['id'],))
+                    conn.commit()
                     st.rerun()
 
         with tabs[1]:
-            JOURNAL_FILE = f"journal_{st.session_state.username}.csv"
-            if os.path.exists(JOURNAL_FILE):
-                journal_df = pd.read_csv(JOURNAL_FILE)
-            else:
-                journal_df = pd.DataFrame(columns=["Date", "Mood", "Entry"])
-
-            with st.form("journal_form"):
-                mood = st.selectbox("🧠 Mood", ["😊 Happy", "😐 Neutral", "😞 Sad", "😠 Angry", "😌 Calm", "😕 Confused"])
-                entry = st.text_area("📝 Journal Entry")
-                submit_entry = st.form_submit_button("💾 Save Entry")
-
-                if submit_entry and entry.strip():
-                    new_entry = pd.DataFrame([{
-                        "Date": pd.Timestamp.today().strftime("%Y-%m-%d"),
-                        "Mood": mood,
-                        "Entry": entry.strip()
-                    }])
-                    journal_df = pd.concat([journal_df, new_entry], ignore_index=True)
-                    journal_df.to_csv(JOURNAL_FILE, index=False)
-                    st.success("Journal saved!")
-
-            if not journal_df.empty:
-                st.subheader("📚 Previous Entries")
-                for _, row in journal_df[::-1].iterrows():
-                    st.markdown(f"**{row['Date']}** - *{row['Mood']}*")
-                    st.info(row['Entry'])
+            st.text_area("Write your thoughts here:")
 
         with tabs[2]:
             st.write("Coming soon: Chat with your AI companion!")
@@ -193,9 +177,8 @@ if st.session_state.logged_in:
         st.write("Learn anything, your way! Coming soon!")
 
     elif st.session_state.page == "Meal Planner":
-        st.header("🍽️ Meal Planner")
-        st.write("Personalized meals and healthy tips. Coming soon!")
-
+        st.header("🍽️ Nutrition & Meal Planner")
+        st.write("Here you'll find personalized meals and healthy tips. Coming soon!")
 else:
     st.title("Welcome to LifeBot AI")
     st.info("Please enter your name in the sidebar to get started.")
