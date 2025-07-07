@@ -41,6 +41,50 @@ if st.sidebar.button(f"Hello, {name_input.title()}!"):
             users_df.to_csv(USER_DB, index=False)
         st.rerun()
 
+import streamlit as st
+import pandas as pd
+import os
+import altair as alt
+
+# Set page config
+st.set_page_config(page_title="LifeBot AI", layout="centered")
+
+# --- Constants ---
+USER_DB = "users.csv"
+
+# --- Ensure User Database Exists and Has Correct Columns ---
+if not os.path.exists(USER_DB) or os.stat(USER_DB).st_size == 0:
+    users_df = pd.DataFrame(columns=["Username"])
+    users_df.to_csv(USER_DB, index=False)
+else:
+    users_df = pd.read_csv(USER_DB)
+    if "Username" not in users_df.columns:
+        users_df = pd.DataFrame(columns=["Username"])
+        users_df.to_csv(USER_DB, index=False)
+
+# --- Session State Initialization ---
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "username" not in st.session_state:
+    st.session_state.username = ""
+if "page" not in st.session_state:
+    st.session_state.page = "Home"
+
+# --- Login via Name Input ---
+if not st.session_state.logged_in:
+    st.sidebar.title("👤 Welcome")
+    name_input = st.sidebar.text_input("Enter your name")
+    if st.sidebar.button(f"Hello, {name_input.title()}!"):
+        if name_input:
+            username = name_input.strip().lower()
+            st.session_state.username = username
+            st.session_state.logged_in = True
+            # Add to database if new
+            if username not in users_df["Username"].str.lower().values:
+                users_df = pd.concat([users_df, pd.DataFrame([{"Username": username}])], ignore_index=True)
+                users_df.to_csv(USER_DB, index=False)
+            st.rerun()
+
 # --- App Content ---
 if st.session_state.logged_in:
     st.sidebar.title("🧭 LifeBot AI Menu")
@@ -51,8 +95,7 @@ if st.session_state.logged_in:
         pages.append("Career Pathfinder")
     elif user_type in ["Adult", "Senior Citizen"]:
         pages.append("Managing Finances")
-    pages.append("Skill-Up AI")
-    pages.append("Meal Planner")
+    pages += ["Skill-Up AI", "Meal Planner"]
 
     selected_page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page))
     st.session_state.page = selected_page
@@ -89,7 +132,6 @@ if st.session_state.logged_in:
 else:
     st.title("Welcome to LifeBot AI")
     st.info("Please enter your name in the sidebar to get started.")
-
 
 # --- Continue only if logged in ---
 if st.session_state.get("logged_in"):
