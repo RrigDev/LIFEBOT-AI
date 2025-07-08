@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
-import sqlite3
+import os
 import altair as alt
+import sqlite3
 from datetime import date
 
 # Set page config
@@ -11,30 +12,41 @@ st.set_page_config(page_title="LifeBot AI", layout="centered")
 conn = sqlite3.connect("lifebot.db", check_same_thread=False)
 c = conn.cursor()
 
-# Create tables if not exist
-c.execute('''CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL
-)''')
+# --- Create tables if not exists ---
+c.execute("""
+CREATE TABLE IF NOT EXISTS users (
+    username TEXT PRIMARY KEY
+)
+""")
 
-c.execute('''CREATE TABLE IF NOT EXISTS tasks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
+c.execute("""
+CREATE TABLE IF NOT EXISTS tasks (
+    username TEXT,
     task TEXT,
-    done BOOLEAN,
+    done INTEGER,
     due_date TEXT,
     category TEXT,
-    completed_date TEXT,
-    FOREIGN KEY(user_id) REFERENCES users(id)
-)''')
+    completed_date TEXT
+)
+""")
 
-c.execute('''CREATE TABLE IF NOT EXISTS task_history (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
+c.execute("""
+CREATE TABLE IF NOT EXISTS history (
+    username TEXT,
     date TEXT,
-    completed INTEGER,
-    FOREIGN KEY(user_id) REFERENCES users(id)
-)''')
+    completed INTEGER
+)
+""")
+
+c.execute("""
+CREATE TABLE IF NOT EXISTS journal (
+    username TEXT,
+    entry TEXT,
+    mood TEXT,
+    created_at TEXT
+)
+""")
+
 conn.commit()
 
 # --- Session State Initialization ---
@@ -51,25 +63,17 @@ name_input = st.sidebar.text_input("Enter your name")
 if st.sidebar.button(f"Hello, {name_input.title()}!"):
     if name_input:
         username = name_input.strip().lower()
-        c.execute("SELECT id FROM users WHERE LOWER(username) = ?", (username,))
-        user = c.fetchone()
-        if not user:
-            c.execute("INSERT INTO users (username) VALUES (?)", (username,))
-            conn.commit()
         st.session_state.username = username
         st.session_state.logged_in = True
+        # Add to database if new
+        c.execute("SELECT username FROM users WHERE LOWER(username) = ?", (username,))
+        if not c.fetchone():
+            c.execute("INSERT INTO users (username) VALUES (?)", (username,))
+            conn.commit()
         st.rerun()
-
-# --- Get Current User ID ---
-def get_user_id():
-    c.execute("SELECT id FROM users WHERE LOWER(username) = ?", (st.session_state.username,))
-    result = c.fetchone()
-    return result[0] if result else None
 
 # --- Continue only if logged in ---
 if st.session_state.get("logged_in"):
-    user_id = get_user_id()
-
     # Sidebar Navigation
     st.sidebar.title("🧭 LifeBot AI Menu")
     user_type = st.sidebar.radio("Who are you?", ["Student", "Adult", "Senior Citizen"], horizontal=True)
@@ -93,22 +97,25 @@ if st.session_state.get("logged_in"):
 
     elif st.session_state.page == "Profile":
         st.header("👤 Your Profile")
-        today_str = date.today().isoformat()
+        today_str = date.today().strftime("%Y-%m-%d")
 
-        c.execute("SELECT COUNT(*) FROM tasks WHERE user_id=? AND done=1 AND DATE(completed_date)=?", (user_id, today_str))
+        c.execute("SELECT COUNT(*) FROM tasks WHERE username = ? AND done = 1 AND completed_date = ?",
+                  (st.session_state.username, today_str))
         done_count_today = c.fetchone()[0]
 
-        c.execute("SELECT * FROM task_history WHERE user_id=? AND date=?", (user_id, today_str))
+        c.execute("SELECT * FROM history WHERE username = ? AND date = ?", (st.session_state.username, today_str))
         if not c.fetchone():
-            c.execute("INSERT INTO task_history (user_id, date, completed) VALUES (?, ?, ?)", (user_id, today_str, done_count_today))
+            c.execute("INSERT INTO history (username, date, completed) VALUES (?, ?, ?)",
+                      (st.session_state.username, today_str, done_count_today))
             conn.commit()
 
-        history_df = pd.read_sql_query("SELECT date, completed FROM task_history WHERE user_id=?", conn, params=(user_id,))
+        c.execute("SELECT date, completed FROM history WHERE username = ?", (st.session_state.username,))
+        history = pd.DataFrame(c.fetchall(), columns=["Date", "Completed"])
 
         st.subheader("📊 Your Task Completion Over Time")
-        chart = alt.Chart(history_df).mark_bar(color="#0984e3").encode(
-            x="date:T",
-            y=alt.Y("completed:Q", title="Tasks Completed")
+        chart = alt.Chart(history).mark_bar(color="#0984e3").encode(
+            x="Date:T",
+            y=alt.Y("Completed:Q", title="Tasks Completed")
         ).properties(width=700, height=300)
         st.altair_chart(chart, use_container_width=True)
 
@@ -117,6 +124,10 @@ if st.session_state.get("logged_in"):
         tabs = st.tabs(["📋 Tasks", "📓 Journal", "💬 Companion"])
 
         with tabs[0]:
+            c.execute("SELECT rowid, * FROM tasks WHERE username = ? ORDER BY done, due_date",
+                      (st.session_state.username,))
+            tasks = pd.DataFrame(c.fetchall(), columns=["rowid", "Username", "Task", "Done", "Due Date", "Category", "Completed Date"])
+
             with st.form("add_task_form", clear_on_submit=True):
                 new_task = st.text_input("📝 Task")
                 due_date = st.date_input("📅 Due Date")
@@ -124,42 +135,62 @@ if st.session_state.get("logged_in"):
                 submitted = st.form_submit_button("➕ Add Task")
 
                 if submitted and new_task.strip():
-                    c.execute('''INSERT INTO tasks (user_id, task, done, due_date, category, completed_date)
-                                 VALUES (?, ?, ?, ?, ?, ?)''',
-                              (user_id, new_task.strip(), False, due_date.isoformat(), category, None))
+                    c.execute("""
+                        INSERT INTO tasks (username, task, done, due_date, category, completed_date)
+                        VALUES (?, ?, 0, ?, ?, NULL)
+                    """, (st.session_state.username, new_task.strip(), str(due_date), category))
                     conn.commit()
                     st.rerun()
 
-            task_df = pd.read_sql_query("SELECT * FROM tasks WHERE user_id=?", conn, params=(user_id,))
-            total = len(task_df)
-            done_count = task_df["done"].sum()
+            total = len(tasks)
+            done_count = tasks["Done"].sum()
             if total > 0:
                 st.progress(done_count / total)
                 st.markdown(f"✅ **{done_count} of {total} tasks completed**")
             else:
                 st.info("No tasks added yet!")
 
-            for _, row in task_df.sort_values(by=["done", "due_date"]).iterrows():
-                col1, col2, col3 = st.columns([0.5, 0.3, 0.2])
+            for i, row in tasks.iterrows():
+                col1, col2, col3 = st.columns([0.6, 0.2, 0.2])
                 with col1:
-                    done = st.checkbox(f"{row['task']} [{row['category']}] (Due: {row['due_date']})", 
-                                       value=row["done"], key=f"done_{row['id']}")
+                    done = st.checkbox(
+                        f"{row['Task']} [{row['Category']}] (Due: {row['Due Date']})",
+                        value=bool(row["Done"]),
+                        key=f"done_{row['rowid']}"
+                    )
                 with col3:
-                    delete = st.button("🗑️", key=f"del_{row['id']}")
+                    delete = st.button("🗑️", key=f"del_{row['rowid']}")
 
-                if done != row["done"]:
-                    completed_date = date.today().isoformat() if done else None
-                    c.execute("UPDATE tasks SET done=?, completed_date=? WHERE id=?", (done, completed_date, row['id']))
+                if done != bool(row["Done"]):
+                    completed_date = date.today().strftime("%Y-%m-%d") if done else None
+                    c.execute("UPDATE tasks SET done = ?, completed_date = ? WHERE rowid = ?",
+                              (int(done), completed_date, row["rowid"]))
                     conn.commit()
                     st.rerun()
 
                 if delete:
-                    c.execute("DELETE FROM tasks WHERE id=?", (row['id'],))
+                    c.execute("DELETE FROM tasks WHERE rowid = ?", (row["rowid"],))
                     conn.commit()
                     st.rerun()
 
         with tabs[1]:
-            st.text_area("Write your thoughts here:")
+            st.subheader("📝 Journal Your Thoughts")
+            mood = st.selectbox("Mood", ["😊 Happy", "😐 Neutral", "😢 Sad", "😡 Angry", "😴 Tired"])
+            entry = st.text_area("Write here")
+            if st.button("💾 Save Entry"):
+                if entry.strip():
+                    c.execute("INSERT INTO journal (username, entry, mood, created_at) VALUES (?, ?, ?, ?)",
+                              (st.session_state.username, entry.strip(), mood, date.today().strftime("%Y-%m-%d")))
+                    conn.commit()
+                    st.success("Entry saved!")
+
+            st.markdown("---")
+            st.subheader("📚 Past Entries")
+            c.execute("SELECT entry, mood, created_at FROM journal WHERE username = ? ORDER BY created_at DESC",
+                      (st.session_state.username,))
+            journal_entries = c.fetchall()
+            for e in journal_entries:
+                st.markdown(f"**{e[2]}** — *{e[1]}*\n> {e[0]}")
 
         with tabs[2]:
             st.write("Coming soon: Chat with your AI companion!")
@@ -179,6 +210,7 @@ if st.session_state.get("logged_in"):
     elif st.session_state.page == "Meal Planner":
         st.header("🍽️ Nutrition & Meal Planner")
         st.write("Here you'll find personalized meals and healthy tips. Coming soon!")
+
 else:
     st.title("Welcome to LifeBot AI")
     st.info("Please enter your name in the sidebar to get started.")
