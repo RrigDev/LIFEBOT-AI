@@ -208,8 +208,55 @@ if st.session_state.get("logged_in"):
         st.write("Learn anything, your way! Coming soon!")
 
     elif st.session_state.page == "Meal Planner":
-        st.header("🍽️ Nutrition & Meal Planner")
-        st.write("Here you'll find personalized meals and healthy tips. Coming soon!")
+        st.title("🍽️ Meal Planner")
+        tabs = st.tabs(["🍲 Log Meal", "🧾 Suggestions", "💧 Water Tracker", "📈 Overview"])
+
+        with tabs[0]:  # Log Meal
+            st.subheader("Log Your Meals")
+            today = datetime.now().strftime("%Y-%m-%d")
+            meal_type = st.selectbox("Meal Type", ["Breakfast", "Lunch", "Dinner", "Snack"])
+            meal_name = st.text_input("Meal Name")
+            mood = st.radio("Mood After Meal", ["🙂 Happy", "😐 Neutral", "🙁 Low"], horizontal=True)
+
+            if st.button("Save Meal"):
+                if meal_name:
+                    cursor.execute("""
+                        INSERT INTO meals (username, date, meal_type, meal_name, mood)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, (st.session_state.username, today, meal_type, meal_name, mood))
+                    conn.commit()
+                    st.success("Meal logged!")
+                else:
+                    st.warning("Please enter the meal name.")
+
+        with tabs[1]:  # Suggestions
+            st.subheader("Healthy Meal Suggestions")
+            now = datetime.now().hour
+            suggestions = {
+                "Breakfast": ["Oats with fruits", "Boiled eggs & toast", "Smoothie bowl"],
+                "Lunch": ["Grilled chicken salad", "Vegetable dal & rice", "Paneer wrap"],
+                "Dinner": ["Soup & whole grain bread", "Quinoa & vegetables", "Tofu stir fry"],
+                "Snack": ["Fruit salad", "Greek yogurt", "Roasted nuts"]
+            }
+            current = "Breakfast" if now < 11 else "Lunch" if now < 17 else "Dinner"
+            for meal in suggestions.get(current, []):
+                st.markdown(f"✅ {meal}")
+
+        with tabs[2]:  # Water Tracker
+            st.subheader("Track Your Water Intake")
+            st.write("Feature coming soon!")
+
+        with tabs[3]:  # Overview
+            st.subheader("Weekly Meal Overview")
+            df = pd.read_sql_query("SELECT date, COUNT(*) as meals FROM meals WHERE username=? GROUP BY date", conn, params=(st.session_state.username,))
+            if not df.empty:
+                chart = alt.Chart(df).mark_bar(color="#00cec9").encode(
+                    x="date:T",
+                    y=alt.Y("meals:Q", title="Meals Logged")
+                ).properties(width=700, height=300)
+                st.altair_chart(chart, use_container_width=True)
+            else:
+                st.info("No meals logged yet.")
 
 else:
     st.title("Welcome to LifeBot AI")
