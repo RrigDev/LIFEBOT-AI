@@ -3,51 +3,37 @@ import pandas as pd
 import os
 import altair as alt
 import sqlite3
-from datetime import datetime,date
+from datetime import datetime, date
 
 # Set page config
 st.set_page_config(page_title="LifeBot AI", layout="centered")
 
 # --- Database Setup ---
 conn = sqlite3.connect("lifebot.db", check_same_thread=False)
-c = conn.cursor()
+cursor = conn.cursor()
 
-# --- Create tables if not exists ---
-c.execute("""
-CREATE TABLE IF NOT EXISTS users (
-    username TEXT PRIMARY KEY
-)
-""")
+# --- Create Tables ---
+cursor.execute('''CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE
+)''')
 
-c.execute("""
-CREATE TABLE IF NOT EXISTS tasks (
-    username TEXT,
-    task TEXT,
-    done INTEGER,
-    due_date TEXT,
-    category TEXT,
-    completed_date TEXT
-)
-""")
-
-c.execute("""
-CREATE TABLE IF NOT EXISTS history (
+cursor.execute('''CREATE TABLE IF NOT EXISTS meals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT,
     date TEXT,
-    completed INTEGER
-)
-""")
+    meal_type TEXT,
+    meal_name TEXT,
+    mood TEXT
+)''')
 
-c.execute("""
-CREATE TABLE IF NOT EXISTS journal (
+cursor.execute('''CREATE TABLE IF NOT EXISTS journals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT,
     entry TEXT,
     mood TEXT,
-    created_at TEXT
-)
-""")
-
-conn.commit()
+    date TEXT
+)''')
 
 # --- Session State Initialization ---
 if "logged_in" not in st.session_state:
@@ -59,6 +45,16 @@ if "page" not in st.session_state:
 
 # --- Login via Name Input ---
 st.sidebar.title("👤 Welcome")
+name_input = st.sidebar.text_input("Enter your name")
+if st.sidebar.button(f"Hello, {name_input.title()}!"):
+    if name_input:
+        username = name_input.strip().lower()
+        st.session_state.username = username
+        st.session_state.logged_in = True
+        cursor.execute("INSERT OR IGNORE INTO users (username) VALUES (?)", (username,))
+        conn.commit()
+        st.rerun()
+title("👤 Welcome")
 name_input = st.sidebar.text_input("Enter your name")
 if st.sidebar.button(f"Hello, {name_input.title()}!"):
     if name_input:
@@ -211,7 +207,7 @@ if st.session_state.get("logged_in"):
         st.title("🍽️ Meal Planner")
         tabs = st.tabs(["🍲 Log Meal", "🧾 Suggestions", "💧 Water Tracker", "📈 Overview"])
 
-        with tabs[0]:  # Log Meal
+        with tabs[0]:
             st.subheader("Log Your Meals")
             today = datetime.now().strftime("%Y-%m-%d")
             meal_type = st.selectbox("Meal Type", ["Breakfast", "Lunch", "Dinner", "Snack"])
@@ -229,7 +225,7 @@ if st.session_state.get("logged_in"):
                 else:
                     st.warning("Please enter the meal name.")
 
-        with tabs[1]:  # Suggestions
+        with tabs[1]:
             st.subheader("Healthy Meal Suggestions")
             now = datetime.now().hour
             suggestions = {
@@ -242,21 +238,30 @@ if st.session_state.get("logged_in"):
             for meal in suggestions.get(current, []):
                 st.markdown(f"✅ {meal}")
 
-        with tabs[2]:  # Water Tracker
+        with tabs[2]:
             st.subheader("Track Your Water Intake")
             st.write("Feature coming soon!")
 
-        with tabs[3]:  # Overview
+        with tabs[3]:
             st.subheader("Weekly Meal Overview")
-            df = pd.read_sql_query("SELECT date, COUNT(*) as meals FROM meals WHERE username=? GROUP BY date", conn, params=(st.session_state.username,))
-            if not df.empty:
-                chart = alt.Chart(df).mark_bar(color="#00cec9").encode(
-                    x="date:T",
-                    y=alt.Y("meals:Q", title="Meals Logged")
-                ).properties(width=700, height=300)
-                st.altair_chart(chart, use_container_width=True)
-            else:
-                st.info("No meals logged yet.")
+            try:
+                df = pd.read_sql_query(
+                    "SELECT date, COUNT(*) as meals FROM meals WHERE username=? GROUP BY date",
+                    conn,
+                    params=(st.session_state.username,)
+                )
+                if not df.empty:
+                    chart = alt.Chart(df).mark_bar(color="#00cec9").encode(
+                        x="date:T",
+                        y=alt.Y("meals:Q", title="Meals Logged")
+                    ).properties(width=700, height=300)
+                    st.altair_chart(chart, use_container_width=True)
+                else:
+                    st.info("No meals logged yet.")
+            except Exception as e:
+                st.error("Database error while fetching meal overview.")
+                st.exception(e)
+
 
 else:
     st.title("Welcome to LifeBot AI")
