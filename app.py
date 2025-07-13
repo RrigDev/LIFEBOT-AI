@@ -3,7 +3,7 @@ import pandas as pd
 import os
 import altair as alt
 import sqlite3
-from datetime import datetime  
+from datetime import datetime,date
 
 # Set page config
 st.set_page_config(page_title="LifeBot AI", layout="centered")
