@@ -131,7 +131,7 @@ if st.session_state.get("logged_in"):
             with st.form("add_task_form", clear_on_submit=True):
                 new_task = st.text_input("📝 Task")
                 due_date = st.date_input("📅 Due Date")
-                category = st.radio("🏷️ Category", ["Study", "Work", "Personal", "Health", "Other"], horizontal=True)
+                category = st.radio("🏷️ Category", ["Study", "Work", "Personal", "Fitness", "Other"], horizontal=True)
                 submitted = st.form_submit_button("➕ Add Task")
 
                 if submitted and new_task.strip():
