@@ -46,7 +46,7 @@ if "page" not in st.session_state:
 # --- Login via Name Input ---
 st.sidebar.title("👤 Welcome")
 name_input = st.sidebar.text_input("Enter your name")
-if st.sidebar.button(f"Hello, {name_input.title()}!"):
+if st.sidebar.button(f"Hello {name_input.title()}!"):
     if name_input:
         username = name_input.strip().lower()
         st.session_state.username = username
@@ -56,7 +56,7 @@ if st.sidebar.button(f"Hello, {name_input.title()}!"):
         st.rerun()
 title("👤 Welcome")
 name_input = st.sidebar.text_input("Enter your name")
-if st.sidebar.button(f"Hello, {name_input.title()}!"):
+if st.sidebar.button(f"Hello {name_input.title()}!"):
     if name_input:
         username = name_input.strip().lower()
         st.session_state.username = username
