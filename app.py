@@ -1,58 +1,19 @@
 import streamlit as st
 import pandas as pd
-import os
 import altair as alt
-import sqlite3
 from datetime import datetime, date
+from supabase import create_client, Client
+import os
 
-# Set page config
+# --- Supabase Setup ---
+SUPABASE_URL = "https://YOUR_PROJECT_ID.supabase.co"
+SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY"
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# --- Streamlit Config ---
 st.set_page_config(page_title="LifeBot AI", layout="centered")
 
-# --- Database Setup ---
-conn = sqlite3.connect("lifebot.db", check_same_thread=False)
-c = conn.cursor()
-
-# --- Create Tables ---
-c.execute('''CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE
-)''')
-
-c.execute('''CREATE TABLE IF NOT EXISTS meals (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT,
-    date TEXT,
-    meal_type TEXT,
-    meal_name TEXT,
-    mood TEXT
-)''')
-
-c.execute('''CREATE TABLE IF NOT EXISTS journals (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT,
-    entry TEXT,
-    mood TEXT,
-    date TEXT
-)''')
-
-c.execute('''CREATE TABLE IF NOT EXISTS tasks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT,
-    task TEXT,
-    done INTEGER,
-    due_date TEXT,
-    category TEXT,
-    completed_date TEXT
-)''')
-
-c.execute('''CREATE TABLE IF NOT EXISTS history (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT,
-    date TEXT,
-    completed INTEGER
-)''')
-
-# --- Session State Initialization ---
+# --- Session State Init ---
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "username" not in st.session_state:
@@ -61,21 +22,19 @@ if "page" not in st.session_state:
     st.session_state.page = "Home"
 
 # --- Login via Name Input ---
-st.sidebar.title("👤 Welcome")
+st.sidebar.title("\U0001F464 Welcome")
 name_input = st.sidebar.text_input("Enter your name", key="username_input")
 if st.sidebar.button("Submit", key="submit_button"):
     if name_input:
         username = name_input.strip().lower()
         st.session_state.username = username
         st.session_state.logged_in = True
-        c.execute("INSERT OR IGNORE INTO users (username) VALUES (?)", (username,))
-        conn.commit()
+        supabase.table("users").insert({"username": username}, upsert=True).execute()
         st.rerun()
 
-# --- Continue only if logged in ---
+# --- If Logged In ---
 if st.session_state.get("logged_in"):
-    # Sidebar Navigation
-    st.sidebar.title("🧭 LifeBot AI Menu")
+    st.sidebar.title("\U0001F9ED LifeBot AI Menu")
     user_type = st.sidebar.radio("Who are you?", ["Student", "Adult", "Senior Citizen"], horizontal=True)
 
     pages = ["Home", "Profile", "Daily Companion"]
@@ -88,128 +47,123 @@ if st.session_state.get("logged_in"):
     selected_page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page))
     st.session_state.page = selected_page
 
-    # --- Main Page Rendering ---
+    # --- Page: Home ---
     if st.session_state.page == "Home":
-        st.title("🤖 LifeBot AI")
+        st.title("\U0001F916 LifeBot AI")
         st.write("Welcome! I'm your all-in-one AI assistant.")
         st.markdown("---")
         st.subheader("Choose a tool from the left menu to begin.")
 
+    # --- Page: Profile ---
     elif st.session_state.page == "Profile":
-        st.header("👤 Your Profile")
+        st.header("\U0001F464 Your Profile")
         today_str = date.today().strftime("%Y-%m-%d")
+        done_today = supabase.table("tasks").select("*")\
+            .eq("username", st.session_state.username).eq("done", True).eq("completed_date", today_str).execute()
+        done_count_today = len(done_today.data)
 
-        c.execute("SELECT COUNT(*) FROM tasks WHERE username = ? AND done = 1 AND completed_date = ?",
-                  (st.session_state.username, today_str))
-        done_count_today = c.fetchone()[0]
+        existing = supabase.table("history").select("*")\
+            .eq("username", st.session_state.username).eq("date", today_str).execute()
+        if not existing.data:
+            supabase.table("history").insert({"username": st.session_state.username, "date": today_str, "completed": done_count_today}).execute()
 
-        c.execute("SELECT * FROM history WHERE username = ? AND date = ?", (st.session_state.username, today_str))
-        if not c.fetchone():
-            c.execute("INSERT INTO history (username, date, completed) VALUES (?, ?, ?)",
-                      (st.session_state.username, today_str, done_count_today))
-            conn.commit()
+        history = supabase.table("history").select("*")\
+            .eq("username", st.session_state.username).execute().data
+        df = pd.DataFrame(history)
+        if not df.empty:
+            st.subheader("\U0001F4CA Your Task Completion Over Time")
+            chart = alt.Chart(df).mark_bar(color="#0984e3").encode(
+                x="date:T",
+                y=alt.Y("completed:Q", title="Tasks Completed")
+            ).properties(width=700, height=300)
+            st.altair_chart(chart, use_container_width=True)
 
-        c.execute("SELECT date, completed FROM history WHERE username = ?", (st.session_state.username,))
-        history = pd.DataFrame(c.fetchall(), columns=["Date", "Completed"])
-
-        st.subheader("📊 Your Task Completion Over Time")
-        chart = alt.Chart(history).mark_bar(color="#0984e3").encode(
-            x="Date:T",
-            y=alt.Y("Completed:Q", title="Tasks Completed")
-        ).properties(width=700, height=300)
-        st.altair_chart(chart, use_container_width=True)
-
+    # --- Page: Daily Companion ---
     elif st.session_state.page == "Daily Companion":
-        st.header("🧠 Daily Companion")
-        tabs = st.tabs(["📋 Tasks", "📓 Journal", "💬 Companion"])
+        st.header("\U0001F9E0 Daily Companion")
+        tabs = st.tabs(["\U0001F4CB Tasks", "\U0001F4D3 Journal", "\U0001F4AC Companion"])
 
+        # --- Tasks Tab ---
         with tabs[0]:
-            c.execute("SELECT rowid, * FROM tasks WHERE username = ? ORDER BY done, due_date",
-                      (st.session_state.username,))
-            tasks = pd.DataFrame(c.fetchall(), columns=["rowid", "Username", "Task", "Done", "Due Date", "Category", "Completed Date"])
+            tasks = supabase.table("tasks").select("*").eq("username", st.session_state.username).order("done").order("due_date").execute().data
+            df = pd.DataFrame(tasks)
 
             with st.form("add_task_form", clear_on_submit=True):
-                new_task = st.text_input("📝 Task")
-                due_date = st.date_input("📅 Due Date")
-                category = st.radio("🏷️ Category", ["Study", "Work", "Personal", "Fitness", "Other"], horizontal=True)
-                submitted = st.form_submit_button("➕ Add Task")
-
-                if submitted and new_task.strip():
-                    c.execute("""
-                        INSERT INTO tasks (username, task, done, due_date, category, completed_date)
-                        VALUES (?, ?, 0, ?, ?, NULL)
-                    """, (st.session_state.username, new_task.strip(), str(due_date), category))
-                    conn.commit()
+                new_task = st.text_input("\U0001F4DD Task")
+                due_date = st.date_input("\U0001F4C5 Due Date")
+                category = st.radio("\U0001F3F7️ Category", ["Study", "Work", "Personal", "Fitness", "Other"], horizontal=True)
+                if st.form_submit_button("➕ Add Task") and new_task.strip():
+                    supabase.table("tasks").insert({
+                        "username": st.session_state.username,
+                        "task": new_task.strip(),
+                        "done": False,
+                        "due_date": str(due_date),
+                        "category": category
+                    }).execute()
                     st.rerun()
 
-            total = len(tasks)
-            done_count = tasks["Done"].sum()
-            if total > 0:
+            if not df.empty:
+                total = len(df)
+                done_count = df["done"].sum()
                 st.progress(done_count / total)
                 st.markdown(f"✅ **{done_count} of {total} tasks completed**")
-            else:
-                st.info("No tasks added yet!")
 
-            for i, row in tasks.iterrows():
-                col1, col2, col3 = st.columns([0.6, 0.2, 0.2])
-                with col1:
-                    done = st.checkbox(
-                        f"{row['Task']} [{row['Category']}] (Due: {row['Due Date']})",
-                        value=bool(row["Done"]),
-                        key=f"done_{row['rowid']}"
-                    )
-                with col3:
-                    delete = st.button("🗑️", key=f"del_{row['rowid']}")
+                for _, row in df.iterrows():
+                    col1, _, col3 = st.columns([0.6, 0.2, 0.2])
+                    with col1:
+                        done = st.checkbox(
+                            f"{row['task']} [{row['category']}] (Due: {row['due_date']})",
+                            value=row["done"],
+                            key=f"done_{row['id']}"
+                        )
+                    with col3:
+                        if st.button("🗑️", key=f"del_{row['id']}"):
+                            supabase.table("tasks").delete().eq("id", row["id"]).execute()
+                            st.rerun()
 
-                if done != bool(row["Done"]):
-                    completed_date = date.today().strftime("%Y-%m-%d") if done else None
-                    c.execute("UPDATE tasks SET done = ?, completed_date = ? WHERE rowid = ?",
-                              (int(done), completed_date, row["rowid"]))
-                    conn.commit()
-                    st.rerun()
+                    if done != row["done"]:
+                        supabase.table("tasks").update({"done": done, "completed_date": str(date.today()) if done else None}).eq("id", row["id"]).execute()
+                        st.rerun()
 
-                if delete:
-                    c.execute("DELETE FROM tasks WHERE rowid = ?", (row["rowid"],))
-                    conn.commit()
-                    st.rerun()
-
+        # --- Journal Tab ---
         with tabs[1]:
-            st.subheader("📝 Journal Your Thoughts")
+            st.subheader("\U0001F4DD Journal Your Thoughts")
             mood = st.selectbox("Mood", ["😊 Happy", "😐 Neutral", "😢 Sad", "😡 Angry", "😴 Tired"])
             entry = st.text_area("Write here")
-            if st.button("💾 Save Entry"):
-                if entry.strip():
-                    c.execute("INSERT INTO journals (username, entry, mood, date) VALUES (?, ?, ?, ?)",
-                              (st.session_state.username, entry.strip(), mood, date.today().strftime("%Y-%m-%d")))
-                    conn.commit()
-                    st.success("Entry saved!")
+            if st.button("💾 Save Entry") and entry.strip():
+                supabase.table("journals").insert({
+                    "username": st.session_state.username,
+                    "entry": entry.strip(),
+                    "mood": mood,
+                    "date": str(date.today())
+                }).execute()
+                st.success("Entry saved!")
 
-            st.markdown("---")
-            st.subheader("📚 Past Entries")
-            c.execute("SELECT entry, mood, date FROM journals WHERE username = ? ORDER BY date DESC",
-                      (st.session_state.username,))
-            journal_entries = c.fetchall()
-            for e in journal_entries:
-                st.markdown(f"**{e[2]}** — *{e[1]}*\n> {e[0]}")
+            st.subheader("\U0001F4DA Past Entries")
+            entries = supabase.table("journals").select("*").eq("username", st.session_state.username).order("date", desc=True).execute().data
+            for e in entries:
+                st.markdown(f"**{e['date']}** — *{e['mood']}*\n> {e['entry']}")
 
+        # --- Companion Tab ---
         with tabs[2]:
             st.write("Coming soon: Chat with your AI companion!")
 
+    # --- Placeholder Pages ---
     elif st.session_state.page == "Career Pathfinder":
-        st.header("💼 Career Pathfinder")
-        st.write("Explore careers based on your skills and interests. Coming soon!")
+        st.header("\U0001F4BC Career Pathfinder")
+        st.info("Explore careers based on your skills and interests. Coming soon!")
 
     elif st.session_state.page == "Managing Finances":
-        st.header("💰 Managing Finances")
-        st.write("Financial planning tools and tips. Coming soon!")
+        st.header("\U0001F4B0 Managing Finances")
+        st.info("Financial planning tools and tips. Coming soon!")
 
     elif st.session_state.page == "Skill-Up AI":
-        st.header("📚 Skill-Up AI")
-        st.write("Learn anything, your way! Coming soon!")
+        st.header("\U0001F4DA Skill-Up AI")
+        st.info("Learn anything, your way! Coming soon!")
 
     elif st.session_state.page == "Meal Planner":
-        st.title("🍽️ Meal Planner")
-        tabs = st.tabs(["🍲 Log Meal", "🧾 Suggestions", "💧 Water Tracker", "📈 Overview"])
+        st.title("\U0001F37D️ Meal Planner")
+        tabs = st.tabs(["\U0001F372 Log Meal", "\U0001F9FE Suggestions", "\U0001F4A7 Water Tracker", "\U0001F4C8 Overview"])
 
         with tabs[0]:
             st.subheader("Log Your Meals")
@@ -218,16 +172,15 @@ if st.session_state.get("logged_in"):
             meal_name = st.text_input("Meal Name")
             mood = st.radio("Mood After Meal", ["🙂 Happy", "😐 Neutral", "🙁 Low"], horizontal=True)
 
-            if st.button("Save Meal"):
-                if meal_name:
-                    c.execute("""
-                        INSERT INTO meals (username, date, meal_type, meal_name, mood)
-                        VALUES (?, ?, ?, ?, ?)
-                    """, (st.session_state.username, today, meal_type, meal_name, mood))
-                    conn.commit()
-                    st.success("Meal logged!")
-                else:
-                    st.warning("Please enter the meal name.")
+            if st.button("Save Meal") and meal_name:
+                supabase.table("meals").insert({
+                    "username": st.session_state.username,
+                    "date": today,
+                    "meal_type": meal_type,
+                    "meal_name": meal_name,
+                    "mood": mood
+                }).execute()
+                st.success("Meal logged!")
 
         with tabs[1]:
             st.subheader("Healthy Meal Suggestions")
@@ -244,27 +197,19 @@ if st.session_state.get("logged_in"):
 
         with tabs[2]:
             st.subheader("Track Your Water Intake")
-            st.write("Feature coming soon!")
+            st.info("Coming soon!")
 
         with tabs[3]:
             st.subheader("Weekly Meal Overview")
-            try:
-                df = pd.read_sql_query(
-                    "SELECT date, COUNT(*) as meals FROM meals WHERE username=? GROUP BY date",
-                    conn,
-                    params=(st.session_state.username,)
-                )
-                if not df.empty:
-                    chart = alt.Chart(df).mark_bar(color="#00cec9").encode(
-                        x="date:T",
-                        y=alt.Y("meals:Q", title="Meals Logged")
-                    ).properties(width=700, height=300)
-                    st.altair_chart(chart, use_container_width=True)
-                else:
-                    st.info("No meals logged yet.")
-            except Exception as e:
-                st.error("Database error while fetching meal overview.")
-                st.exception(e)
+            data = supabase.table("meals").select("date").eq("username", st.session_state.username).execute().data
+            df = pd.DataFrame(data)
+            if not df.empty:
+                count_df = df.groupby("date").size().reset_index(name="meals")
+                chart = alt.Chart(count_df).mark_bar(color="#00cec9").encode(
+                    x="date:T",
+                    y=alt.Y("meals:Q", title="Meals Logged")
+                ).properties(width=700, height=300)
+                st.altair_chart(chart, use_container_width=True)
 
 else:
     st.title("Welcome to LifeBot AI")
