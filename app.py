@@ -10,15 +10,15 @@ st.set_page_config(page_title="LifeBot AI", layout="centered")
 
 # --- Database Setup ---
 conn = sqlite3.connect("lifebot.db", check_same_thread=False)
-cursor = conn.cursor()
+c = conn.cursor()
 
 # --- Create Tables ---
-cursor.execute('''CREATE TABLE IF NOT EXISTS users (
+c.execute('''CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE
 )''')
 
-cursor.execute('''CREATE TABLE IF NOT EXISTS meals (
+c.execute('''CREATE TABLE IF NOT EXISTS meals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT,
     date TEXT,
@@ -27,12 +27,29 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS meals (
     mood TEXT
 )''')
 
-cursor.execute('''CREATE TABLE IF NOT EXISTS journals (
+c.execute('''CREATE TABLE IF NOT EXISTS journals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT,
     entry TEXT,
     mood TEXT,
     date TEXT
+)''')
+
+c.execute('''CREATE TABLE IF NOT EXISTS tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT,
+    task TEXT,
+    done INTEGER,
+    due_date TEXT,
+    category TEXT,
+    completed_date TEXT
+)''')
+
+c.execute('''CREATE TABLE IF NOT EXISTS history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT,
+    date TEXT,
+    completed INTEGER
 )''')
 
 # --- Session State Initialization ---
@@ -45,27 +62,14 @@ if "page" not in st.session_state:
 
 # --- Login via Name Input ---
 st.sidebar.title("👤 Welcome")
-name_input = st.sidebar.text_input("Enter your name")
-if st.sidebar.button(f"Hello, {name_input.title()}!"):
+name_input = st.sidebar.text_input("Enter your name", key="username_input")
+if st.sidebar.button("Submit", key="submit_button"):
     if name_input:
         username = name_input.strip().lower()
         st.session_state.username = username
         st.session_state.logged_in = True
-        cursor.execute("INSERT OR IGNORE INTO users (username) VALUES (?)", (username,))
+        c.execute("INSERT OR IGNORE INTO users (username) VALUES (?)", (username,))
         conn.commit()
-        st.rerun()
-st.title("👤 Welcome")
-name_input = st.sidebar.text_input("Enter your name")
-if st.sidebar.button(f"Hello, {name_input.title()}!"):
-    if name_input:
-        username = name_input.strip().lower()
-        st.session_state.username = username
-        st.session_state.logged_in = True
-        # Add to database if new
-        c.execute("SELECT username FROM users WHERE LOWER(username) = ?", (username,))
-        if not c.fetchone():
-            c.execute("INSERT INTO users (username) VALUES (?)", (username,))
-            conn.commit()
         st.rerun()
 
 # --- Continue only if logged in ---
@@ -175,14 +179,14 @@ if st.session_state.get("logged_in"):
             entry = st.text_area("Write here")
             if st.button("💾 Save Entry"):
                 if entry.strip():
-                    c.execute("INSERT INTO journal (username, entry, mood, created_at) VALUES (?, ?, ?, ?)",
+                    c.execute("INSERT INTO journals (username, entry, mood, date) VALUES (?, ?, ?, ?)",
                               (st.session_state.username, entry.strip(), mood, date.today().strftime("%Y-%m-%d")))
                     conn.commit()
                     st.success("Entry saved!")
 
             st.markdown("---")
             st.subheader("📚 Past Entries")
-            c.execute("SELECT entry, mood, created_at FROM journal WHERE username = ? ORDER BY created_at DESC",
+            c.execute("SELECT entry, mood, date FROM journals WHERE username = ? ORDER BY date DESC",
                       (st.session_state.username,))
             journal_entries = c.fetchall()
             for e in journal_entries:
@@ -216,7 +220,7 @@ if st.session_state.get("logged_in"):
 
             if st.button("Save Meal"):
                 if meal_name:
-                    cursor.execute("""
+                    c.execute("""
                         INSERT INTO meals (username, date, meal_type, meal_name, mood)
                         VALUES (?, ?, ?, ?, ?)
                     """, (st.session_state.username, today, meal_type, meal_name, mood))
@@ -261,7 +265,6 @@ if st.session_state.get("logged_in"):
             except Exception as e:
                 st.error("Database error while fetching meal overview.")
                 st.exception(e)
-
 
 else:
     st.title("Welcome to LifeBot AI")
