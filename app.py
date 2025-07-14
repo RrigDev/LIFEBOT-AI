@@ -54,7 +54,7 @@ if st.sidebar.button(f"Hello, {name_input.title()}!"):
         cursor.execute("INSERT OR IGNORE INTO users (username) VALUES (?)", (username,))
         conn.commit()
         st.rerun()
-title("👤 Welcome")
+st.title("👤 Welcome")
 name_input = st.sidebar.text_input("Enter your name")
 if st.sidebar.button(f"Hello, {name_input.title()}!"):
     if name_input:
