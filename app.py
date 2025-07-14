@@ -6,20 +6,17 @@ from supabase import create_client, Client
 import os
 
 # --- Supabase Setup ---
-SUPABASE_URL = https://zphpikwyhjeybysfpcfn.supabase.co
-SUPABASE_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwaHBpa3d5aGpleWJ5c2ZwY2ZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI0NjgwMTgsImV4cCI6MjA2ODA0NDAxOH0.2S0VxzExFvYj56BrrcS1dH9xfV9I2Tng_S8VJFrBrS4
+SUPABASE_URL = "https://zphpikwyhjeybysfpcfn.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwaHBpa3d5aGpleWJ5c2ZwY2ZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI0NjgwMTgsImV4cCI6MjA2ODA0NDAxOH0.2S0VxzExFvYj56BrrcS1dH9xfV9I2Tng_S8VJFrBrS4"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # --- Streamlit Config ---
 st.set_page_config(page_title="LifeBot AI", layout="centered")
 
 # --- Session State Init ---
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "username" not in st.session_state:
-    st.session_state.username = ""
-if "page" not in st.session_state:
-    st.session_state.page = "Home"
+for key in ["logged_in", "username", "page"]:
+    if key not in st.session_state:
+        st.session_state[key] = False if key == "logged_in" else ""
 
 # --- Login via Name Input ---
 st.sidebar.title("\U0001F464 Welcome")
@@ -29,23 +26,19 @@ if st.sidebar.button("Submit", key="submit_button"):
         username = name_input.strip().lower()
         st.session_state.username = username
         st.session_state.logged_in = True
-        supabase.table("users").insert({"username": username}, upsert=True).execute()
+        supabase.table("users").upsert({"username": username}).execute()
         st.rerun()
 
 # --- If Logged In ---
-if st.session_state.get("logged_in"):
+if st.session_state.logged_in:
     st.sidebar.title("\U0001F9ED LifeBot AI Menu")
     user_type = st.sidebar.radio("Who are you?", ["Student", "Adult", "Senior Citizen"], horizontal=True)
 
     pages = ["Home", "Profile", "Daily Companion"]
-    if user_type == "Student":
-        pages.append("Career Pathfinder")
-    elif user_type in ["Adult", "Senior Citizen"]:
-        pages.append("Managing Finances")
+    pages.append("Career Pathfinder" if user_type == "Student" else "Managing Finances")
     pages.extend(["Skill-Up AI", "Meal Planner"])
 
-    selected_page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page))
-    st.session_state.page = selected_page
+    st.session_state.page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page))
 
     # --- Page: Home ---
     if st.session_state.page == "Home":
@@ -57,18 +50,17 @@ if st.session_state.get("logged_in"):
     # --- Page: Profile ---
     elif st.session_state.page == "Profile":
         st.header("\U0001F464 Your Profile")
-        today_str = date.today().strftime("%Y-%m-%d")
+        today_str = str(date.today())
         done_today = supabase.table("tasks").select("*")\
-            .eq("username", st.session_state.username).eq("done", True).eq("completed_date", today_str).execute()
-        done_count_today = len(done_today.data)
+            .eq("username", st.session_state.username).eq("done", True).eq("completed_date", today_str).execute().data
 
-        existing = supabase.table("history").select("*")\
-            .eq("username", st.session_state.username).eq("date", today_str).execute()
-        if not existing.data:
-            supabase.table("history").insert({"username": st.session_state.username, "date": today_str, "completed": done_count_today}).execute()
+        if not supabase.table("history").select("*")\
+                .eq("username", st.session_state.username).eq("date", today_str).execute().data:
+            supabase.table("history").insert({"username": st.session_state.username, "date": today_str, "completed": len(done_today)}).execute()
 
         history = supabase.table("history").select("*")\
             .eq("username", st.session_state.username).execute().data
+
         df = pd.DataFrame(history)
         if not df.empty:
             st.subheader("\U0001F4CA Your Task Completion Over Time")
@@ -83,9 +75,10 @@ if st.session_state.get("logged_in"):
         st.header("\U0001F9E0 Daily Companion")
         tabs = st.tabs(["\U0001F4CB Tasks", "\U0001F4D3 Journal", "\U0001F4AC Companion"])
 
-        # --- Tasks Tab ---
+        # --- Tasks ---
         with tabs[0]:
-            tasks = supabase.table("tasks").select("*").eq("username", st.session_state.username).order("done").order("due_date").execute().data
+            tasks = supabase.table("tasks").select("*")\
+                .eq("username", st.session_state.username).order("done").order("due_date").execute().data
             df = pd.DataFrame(tasks)
 
             with st.form("add_task_form", clear_on_submit=True):
@@ -122,10 +115,11 @@ if st.session_state.get("logged_in"):
                             st.rerun()
 
                     if done != row["done"]:
-                        supabase.table("tasks").update({"done": done, "completed_date": str(date.today()) if done else None}).eq("id", row["id"]).execute()
+                        supabase.table("tasks").update({"done": done, "completed_date": str(date.today()) if done else None})\
+                            .eq("id", row["id"]).execute()
                         st.rerun()
 
-        # --- Journal Tab ---
+        # --- Journal ---
         with tabs[1]:
             st.subheader("\U0001F4DD Journal Your Thoughts")
             mood = st.selectbox("Mood", ["😊 Happy", "😐 Neutral", "😢 Sad", "😡 Angry", "😴 Tired"])
@@ -140,11 +134,12 @@ if st.session_state.get("logged_in"):
                 st.success("Entry saved!")
 
             st.subheader("\U0001F4DA Past Entries")
-            entries = supabase.table("journals").select("*").eq("username", st.session_state.username).order("date", desc=True).execute().data
+            entries = supabase.table("journals").select("*")\
+                .eq("username", st.session_state.username).order("date", desc=True).execute().data
             for e in entries:
                 st.markdown(f"**{e['date']}** — *{e['mood']}*\n> {e['entry']}")
 
-        # --- Companion Tab ---
+        # --- Companion ---
         with tabs[2]:
             st.write("Coming soon: Chat with your AI companion!")
 
