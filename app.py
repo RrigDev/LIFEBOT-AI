@@ -31,7 +31,7 @@ existing_user = supabase.table("users").select("id").eq("username", username).ex
 if not existing_user.data:
     supabase.table("users").insert({"username": username}).execute()
 
-        st.session_state.logged_in = True
+       st.session_state.logged_in = True
         supabase.table("users").upsert(
     {"username": username},
     on_conflict=["username"]
