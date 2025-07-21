@@ -26,8 +26,17 @@ if st.sidebar.button("Submit", key="submit_button"):
     if name_input:
         username = name_input.strip().lower()
         st.session_state.username = username
+# Ensure user exists in the users table
+existing_user = supabase.table("users").select("id").eq("username", username).execute()
+if not existing_user.data:
+    supabase.table("users").insert({"username": username}).execute()
+
         st.session_state.logged_in = True
-        supabase.table("users").upsert({"username": username}).execute()
+        supabase.table("users").upsert(
+    {"username": username},
+    on_conflict=["username"]
+).execute()
+
         st.rerun()
 
 # --- If Logged In ---
