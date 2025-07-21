@@ -3,6 +3,7 @@ import pandas as pd
 import altair as alt
 from datetime import datetime, date
 from supabase_client import supabase
+from supabase import create_client, Client
 import os
 
 # --- Supabase Setup ---
