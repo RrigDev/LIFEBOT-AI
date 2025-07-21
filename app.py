@@ -38,6 +38,10 @@ if st.session_state.logged_in:
     pages = ["Home", "Profile", "Daily Companion"]
     pages.append("Career Pathfinder" if user_type == "Student" else "Managing Finances")
     pages.extend(["Skill-Up AI", "Meal Planner"])
+    
+if "page" not in st.session_state:
+    st.session_state.page = pages[0]  # or any default page like "Home"
+
 
     st.session_state.page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page))
 
