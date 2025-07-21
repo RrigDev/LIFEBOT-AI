@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 from datetime import datetime, date
-from supabase import create_client, Client
+from supabase_client import supabase
 import os
 
 # --- Supabase Setup ---
