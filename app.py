@@ -1,166 +1,225 @@
 import streamlit as st
 import pandas as pd
-import os
 import altair as alt
+from datetime import datetime, date
+from supabase_client import supabase
+from supabase import create_client, Client
+import os
 
-# Set page config
+# --- Supabase Setup ---
+SUPABASE_URL = "https://zphpikwyhjeybysfpcfn.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwaHBpa3d5aGpleWJ5c2ZwY2ZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI0NjgwMTgsImV4cCI6MjA2ODA0NDAxOH0.2S0VxzExFvYj56BrrcS1dH9xfV9I2Tng_S8VJFrBrS4"
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# --- Streamlit Config ---
 st.set_page_config(page_title="LifeBot AI", layout="centered")
 
-# --- Sidebar ---
-st.sidebar.title("🧭 LifeBot AI Menu")
+# --- Session State Init ---
+for key in ["logged_in", "username", "page"]:
+    if key not in st.session_state:
+        st.session_state[key] = False if key == "logged_in" else ""
 
-# Set up session state
+# --- Login via Name Input ---
+st.sidebar.title("\U0001F464 Welcome")
+name_input = st.sidebar.text_input("Enter your name", key="username_input")
+if st.sidebar.button("Submit", key="submit_button"):
+    if name_input:
+        username = name_input.strip().lower()
+        st.session_state.username = username
+# Ensure user exists in the users table
+existing_user = supabase.table("users").select("id").eq("username", username).execute()
+if not existing_user.data:
+    supabase.table("users").insert({"username": username}).execute()
+
+       st.session_state.logged_in = True
+        supabase.table("users").upsert(
+    {"username": username},
+    on_conflict=["username"]
+).execute()
+
+        st.rerun()
+
+# --- If Logged In ---
+if st.session_state.logged_in:
+    st.sidebar.title("\U0001F9ED LifeBot AI Menu")
+    user_type = st.sidebar.radio("Who are you?", ["Student", "Adult", "Senior Citizen"], horizontal=True)
+
+    pages = ["Home", "Profile", "Daily Companion"]
+    pages.append("Career Pathfinder" if user_type == "Student" else "Managing Finances")
+    pages.extend(["Skill-Up AI", "Meal Planner"])
+    
 if "page" not in st.session_state:
-    st.session_state.page = "Home"
+    st.session_state.page = pages[0]  # or any default page like "Home"
 
-# Profile button (top of sidebar)
-if st.sidebar.button("👤 Go to Profile"):
-    st.session_state.page = "Profile"
 
-# User type selection
-user_type = st.sidebar.radio("Who are you?", ["Student", "Adult", "Senior Citizen"], horizontal=True)
+    st.session_state.page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page))
 
-# Dynamic page options based on user type
-pages = ["Home", "Daily Companion"]
-if user_type == "Student":
-    pages.append("Career Pathfinder")
-elif user_type in ["Adult", "Senior Citizen"]:
-    pages.append("Managing Finances")
-pages.append("Skill-Up AI")
-pages.append("Meal Planner")
+    # --- Page: Home ---
+    if st.session_state.page == "Home":
+        st.title("\U0001F916 LifeBot AI")
+        st.write("Welcome! I'm your all-in-one AI assistant.")
+        st.markdown("---")
+        st.subheader("Choose a tool from the left menu to begin.")
 
-# Only show Go to menu if not on Profile page
-if st.session_state.page != "Profile":
-    selected_page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page))
-    st.session_state.page = selected_page
+    # --- Page: Profile ---
+    elif st.session_state.page == "Profile":
+        st.header("\U0001F464 Your Profile")
+        today_str = str(date.today())
+        done_today = supabase.table("tasks").select("*")\
+            .eq("username", st.session_state.username).eq("done", True).eq("completed_date", today_str).execute().data
 
-# --- PAGE CONTENT ---
-if st.session_state.page == "Home":
-    st.title("🤖 LifeBot AI")
-    st.write("Welcome! I’m your all-in-one AI assistant for students, parents, professionals — and everyone in between.")
-    st.markdown("---")
-    st.subheader("Choose a tool from the left menu to begin.")
-    st.write("🔒 Your data is safe. AI suggestions are personalized and private.")
+        if not supabase.table("history").select("*")\
+                .eq("username", st.session_state.username).eq("date", today_str).execute().data:
+            supabase.table("history").insert({"username": st.session_state.username, "date": today_str, "completed": len(done_today)}).execute()
 
-elif st.session_state.page == "Daily Companion":
-    st.header("🧠 Daily Companion")
+        history = supabase.table("history").select("*")\
+            .eq("username", st.session_state.username).execute().data
 
-    tabs = st.tabs(["📋 Tasks", "📓 Journal", "💬 Companion"])
+        df = pd.DataFrame(history)
+        if not df.empty:
+            st.subheader("\U0001F4CA Your Task Completion Over Time")
+            chart = alt.Chart(df).mark_bar(color="#0984e3").encode(
+                x="date:T",
+                y=alt.Y("completed:Q", title="Tasks Completed")
+            ).properties(width=700, height=300)
+            st.altair_chart(chart, use_container_width=True)
 
-    with tabs[0]:
-        TASK_FILE = "tasks.csv"
+    # --- Page: Daily Companion ---
+    elif st.session_state.page == "Daily Companion":
+        st.header("\U0001F9E0 Daily Companion")
+        tabs = st.tabs(["\U0001F4CB Tasks", "\U0001F4D3 Journal", "\U0001F4AC Companion"])
 
-        if os.path.exists(TASK_FILE):
-            tasks = pd.read_csv(TASK_FILE)
-        else:
-            tasks = pd.DataFrame(columns=["Task", "Done", "Due Date", "Category", "Completed Date"])
+        # --- Tasks ---
+        with tabs[0]:
+            tasks = supabase.table("tasks").select("*")\
+                .eq("username", st.session_state.username).order("done").order("due_date").execute().data
+            df = pd.DataFrame(tasks)
 
-        with st.form("add_task_form", clear_on_submit=True):
-            new_task = st.text_input("📝 Task")
-            due_date = st.date_input("📅 Due Date")
-            category = st.radio("🏷️ Category", ["Study", "Work", "Personal", "Health", "Other"], horizontal=True)
-            submitted = st.form_submit_button("➕ Add Task")
+            with st.form("add_task_form", clear_on_submit=True):
+                new_task = st.text_input("\U0001F4DD Task")
+                due_date = st.date_input("\U0001F4C5 Due Date")
+                category = st.radio("\U0001F3F7️ Category", ["Study", "Work", "Personal", "Fitness", "Other"], horizontal=True)
+                if st.form_submit_button("➕ Add Task") and new_task.strip():
+                    supabase.table("tasks").insert({
+                        "username": st.session_state.username,
+                        "task": new_task.strip(),
+                        "done": False,
+                        "due_date": str(due_date),
+                        "category": category
+                    }).execute()
+                    st.rerun()
 
-            if submitted and new_task.strip():
-                new_row = pd.DataFrame([{
-                    "Task": new_task.strip(),
-                    "Done": False,
-                    "Due Date": due_date,
-                    "Category": category,
-                    "Completed Date": pd.NaT
-                }])
-                tasks = pd.concat([tasks, new_row], ignore_index=True)
-                tasks.to_csv(TASK_FILE, index=False)
-                st.rerun()
+            if not df.empty:
+                total = len(df)
+                done_count = df["done"].sum()
+                st.progress(done_count / total)
+                st.markdown(f"✅ **{done_count} of {total} tasks completed**")
 
-        total = len(tasks)
-        done_count = tasks["Done"].sum()
-        if total > 0:
-            st.progress(done_count / total)
-            st.markdown(f"✅ **{done_count} of {total} tasks completed**")
-        else:
-            st.info("No tasks added yet!")
+                for _, row in df.iterrows():
+                    col1, _, col3 = st.columns([0.6, 0.2, 0.2])
+                    with col1:
+                        done = st.checkbox(
+                            f"{row['task']} [{row['category']}] (Due: {row['due_date']})",
+                            value=row["done"],
+                            key=f"done_{row['id']}"
+                        )
+                    with col3:
+                        if st.button("🗑️", key=f"del_{row['id']}"):
+                            supabase.table("tasks").delete().eq("id", row["id"]).execute()
+                            st.rerun()
 
-        tasks_sorted = tasks.sort_values(by=["Done", "Due Date"])
+                    if done != row["done"]:
+                        supabase.table("tasks").update({"done": done, "completed_date": str(date.today()) if done else None})\
+                            .eq("id", row["id"]).execute()
+                        st.rerun()
 
-        for i, row in tasks_sorted.iterrows():
-            col1, col2, col3 = st.columns([0.5, 0.3, 0.2])
-            with col1:
-                done = st.checkbox(f"{row['Task']} [{row['Category']}] (Due: {row['Due Date']})", value=row["Done"], key=f"done_{i}")
-            with col2:
-                st.write("")
-            with col3:
-                delete = st.button("🗑️", key=f"del_{i}")
+        # --- Journal ---
+        with tabs[1]:
+            st.subheader("\U0001F4DD Journal Your Thoughts")
+            mood = st.selectbox("Mood", ["😊 Happy", "😐 Neutral", "😢 Sad", "😡 Angry", "😴 Tired"])
+            entry = st.text_area("Write here")
+            if st.button("💾 Save Entry") and entry.strip():
+                supabase.table("journals").insert({
+                    "username": st.session_state.username,
+                    "entry": entry.strip(),
+                    "mood": mood,
+                    "date": str(date.today())
+                }).execute()
+                st.success("Entry saved!")
 
-            if done != row["Done"]:
-                tasks.at[i, "Done"] = done
-                if done:
-                    tasks.at[i, "Completed Date"] = pd.Timestamp.today().normalize()
-                else:
-                    tasks.at[i, "Completed Date"] = pd.NaT
-                tasks.to_csv(TASK_FILE, index=False)
-                st.rerun()
+            st.subheader("\U0001F4DA Past Entries")
+            entries = supabase.table("journals").select("*")\
+                .eq("username", st.session_state.username).order("date", desc=True).execute().data
+            for e in entries:
+                st.markdown(f"**{e['date']}** — *{e['mood']}*\n> {e['entry']}")
 
-            if delete:
-                tasks = tasks.drop(i)
-                tasks.to_csv(TASK_FILE, index=False)
-                st.rerun()
+        # --- Companion ---
+        with tabs[2]:
+            st.write("Coming soon: Chat with your AI companion!")
 
-    with tabs[1]:
-        st.text_area("Write your thoughts here:")
+    # --- Placeholder Pages ---
+    elif st.session_state.page == "Career Pathfinder":
+        st.header("\U0001F4BC Career Pathfinder")
+        st.info("Explore careers based on your skills and interests. Coming soon!")
 
-    with tabs[2]:
-        st.write("Coming soon: Chat with your AI companion!")
+    elif st.session_state.page == "Managing Finances":
+        st.header("\U0001F4B0 Managing Finances")
+        st.info("Financial planning tools and tips. Coming soon!")
 
-elif st.session_state.page == "Profile":
-    st.header("👤 Your Profile")
+    elif st.session_state.page == "Skill-Up AI":
+        st.header("\U0001F4DA Skill-Up AI")
+        st.info("Learn anything, your way! Coming soon!")
 
-    HISTORY_FILE = "task_history.csv"
-    today_str = pd.Timestamp.today().strftime("%Y-%m-%d")
+    elif st.session_state.page == "Meal Planner":
+        st.title("\U0001F37D️ Meal Planner")
+        tabs = st.tabs(["\U0001F372 Log Meal", "\U0001F9FE Suggestions", "\U0001F4A7 Water Tracker", "\U0001F4C8 Overview"])
 
-    if os.path.exists("tasks.csv"):
-        tasks = pd.read_csv("tasks.csv")
-    else:
-        tasks = pd.DataFrame(columns=["Task", "Done", "Completed Date"])
+        with tabs[0]:
+            st.subheader("Log Your Meals")
+            today = datetime.now().strftime("%Y-%m-%d")
+            meal_type = st.selectbox("Meal Type", ["Breakfast", "Lunch", "Dinner", "Snack"])
+            meal_name = st.text_input("Meal Name")
+            mood = st.radio("Mood After Meal", ["🙂 Happy", "😐 Neutral", "🙁 Low"], horizontal=True)
 
-    done_count_today = tasks[(tasks["Done"] == True) & (pd.to_datetime(tasks["Completed Date"]).dt.strftime("%Y-%m-%d") == today_str)].shape[0]
+            if st.button("Save Meal") and meal_name:
+                supabase.table("meals").insert({
+                    "username": st.session_state.username,
+                    "date": today,
+                    "meal_type": meal_type,
+                    "meal_name": meal_name,
+                    "mood": mood
+                }).execute()
+                st.success("Meal logged!")
 
-    if os.path.exists(HISTORY_FILE):
-        history = pd.read_csv(HISTORY_FILE)
-    else:
-        history = pd.DataFrame(columns=["Date", "Completed"])
+        with tabs[1]:
+            st.subheader("Healthy Meal Suggestions")
+            now = datetime.now().hour
+            suggestions = {
+                "Breakfast": ["Oats with fruits", "Boiled eggs & toast", "Smoothie bowl"],
+                "Lunch": ["Grilled chicken salad", "Vegetable dal & rice", "Paneer wrap"],
+                "Dinner": ["Soup & whole grain bread", "Quinoa & vegetables", "Tofu stir fry"],
+                "Snack": ["Fruit salad", "Greek yogurt", "Roasted nuts"]
+            }
+            current = "Breakfast" if now < 11 else "Lunch" if now < 17 else "Dinner"
+            for meal in suggestions.get(current, []):
+                st.markdown(f"✅ {meal}")
 
-    if today_str in history["Date"].values:
-        history.loc[history["Date"] == today_str, "Completed"] = done_count_today
-    else:
-        new_entry = pd.DataFrame([{"Date": today_str, "Completed": done_count_today}])
-        history = pd.concat([history, new_entry], ignore_index=True)
+        with tabs[2]:
+            st.subheader("Track Your Water Intake")
+            st.info("Coming soon!")
 
-    history.to_csv(HISTORY_FILE, index=False)
+        with tabs[3]:
+            st.subheader("Weekly Meal Overview")
+            data = supabase.table("meals").select("date").eq("username", st.session_state.username).execute().data
+            df = pd.DataFrame(data)
+            if not df.empty:
+                count_df = df.groupby("date").size().reset_index(name="meals")
+                chart = alt.Chart(count_df).mark_bar(color="#00cec9").encode(
+                    x="date:T",
+                    y=alt.Y("meals:Q", title="Meals Logged")
+                ).properties(width=700, height=300)
+                st.altair_chart(chart, use_container_width=True)
 
-    st.subheader("📊 Your Task Completion Over Time")
-    chart = alt.Chart(history).mark_bar(color="#0984e3").encode(
-        x="Date:T",
-        y=alt.Y("Completed:Q", title="Tasks Completed")
-    ).properties(
-        width=700,
-        height=300
-    )
-
-    st.altair_chart(chart, use_container_width=True)
-
-elif st.session_state.page == "Meal Planner":
-    st.header("🍽️ Nutrition & Meal Planner")
-    st.write("Here you'll find personalized meals and healthy tips. Coming soon!")
-
-elif st.session_state.page == "Career Pathfinder":
-    st.header("💼 Career Pathfinder")
-    st.write("Explore careers based on your skills and interests. Coming soon!")
-
-elif st.session_state.page == "Managing Finances":
-    st.header("💰 Managing Finances")
-    st.write("Financial planning tools and tips. Coming soon!")
-
-elif st.session_state.page == "Skill-Up AI":
-    st.header("📚 Skill-Up AI")
-    st.write("Learn anything, your way! Coming soon!")
+else:
+    st.title("Welcome to LifeBot AI")
+    st.info("Please enter your name in the sidebar to get started.")
