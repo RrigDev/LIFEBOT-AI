@@ -222,4 +222,8 @@ if "page" not in st.session_state:
 
 else:
     st.title("Welcome to LifeBot AI")
+<<<<<<< HEAD
     st.info("Please enter your name in the sidebar to get started.")
+=======
+    st.info("Please enter your name in the sidebar to get started.")
+>>>>>>> b375251bef7b42fe25f1f28dc674c78429e6e784

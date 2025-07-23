@@ -8,7 +8,11 @@ if defined _OLD_CODEPAGE (
     "%SystemRoot%\System32\chcp.com" 65001 > nul
 )
 
+<<<<<<< HEAD
 set VIRTUAL_ENV=C:\Users\STUDENT\Desktop\GitHub\LIFEBOT-AI\venv
+=======
+set VIRTUAL_ENV=C:\Users\devrr\OneDrive\Desktop\LIFEBOT-AI\venv
+>>>>>>> b375251bef7b42fe25f1f28dc674c78429e6e784
 
 if not defined PROMPT set PROMPT=$P$G
 
