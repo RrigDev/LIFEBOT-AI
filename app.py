@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 from datetime import datetime, date
-from supabase_client import supabase
 from supabase import create_client, Client
 import os
 
@@ -26,17 +25,13 @@ if st.sidebar.button("Submit", key="submit_button"):
     if name_input:
         username = name_input.strip().lower()
         st.session_state.username = username
-# Ensure user exists in the users table
-existing_user = supabase.table("users").select("id").eq("username", username).execute()
-if not existing_user.data:
-    supabase.table("users").insert({"username": username}).execute()
 
-       st.session_state.logged_in = True
-        supabase.table("users").upsert(
-    {"username": username},
-    on_conflict=["username"]
-).execute()
+        # Ensure user exists in the users table
+        existing_user = supabase.table("users").select("id").eq("username", username).execute()
+        if not existing_user.data:
+            supabase.table("users").insert({"username": username}).execute()
 
+        st.session_state.logged_in = True
         st.rerun()
 
 # --- If Logged In ---
@@ -47,10 +42,9 @@ if st.session_state.logged_in:
     pages = ["Home", "Profile", "Daily Companion"]
     pages.append("Career Pathfinder" if user_type == "Student" else "Managing Finances")
     pages.extend(["Skill-Up AI", "Meal Planner"])
-    
-if "page" not in st.session_state:
-    st.session_state.page = pages[0]  # or any default page like "Home"
 
+    if "page" not in st.session_state or st.session_state.page not in pages:
+        st.session_state.page = pages[0]
 
     st.session_state.page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page))
 
@@ -222,8 +216,4 @@ if "page" not in st.session_state:
 
 else:
     st.title("Welcome to LifeBot AI")
-<<<<<<< HEAD
     st.info("Please enter your name in the sidebar to get started.")
-=======
-    st.info("Please enter your name in the sidebar to get started.")
->>>>>>> b375251bef7b42fe25f1f28dc674c78429e6e784
