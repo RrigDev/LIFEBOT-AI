@@ -25,26 +25,21 @@ if st.sidebar.button("Submit", key="submit_button"):
     if name_input:
         username = name_input.strip().lower()
         st.session_state.username = username
-<<<<<<< HEAD
         
-=======
 
->>>>>>> fe5c47994460a5aceca04aa98966135e57df364c
         # Ensure user exists in the users table
         existing_user = supabase.table("users").select("id").eq("username", username).execute()
         if not existing_user.data:
             supabase.table("users").insert({"username": username}).execute()
-<<<<<<< HEAD
         
         st.session_state.logged_in = True
         supabase.table("users").upsert(
             {"username": username},
             on_conflict=["username"]
         ).execute()
-=======
+
 
         st.session_state.logged_in = True
->>>>>>> fe5c47994460a5aceca04aa98966135e57df364c
         st.rerun()
 
 # --- If Logged In ---
@@ -55,15 +50,14 @@ if st.session_state.logged_in:
     pages = ["Home", "Profile", "Daily Companion"]
     pages.append("Career Pathfinder" if user_type == "Student" else "Managing Finances")
     pages.extend(["Skill-Up AI", "Meal Planner"])
-<<<<<<< HEAD
+
     
     if "page" not in st.session_state:
         st.session_state.page = pages[0]  # or any default page like "Home"
-=======
+
 
     if "page" not in st.session_state or st.session_state.page not in pages:
         st.session_state.page = pages[0]
->>>>>>> fe5c47994460a5aceca04aa98966135e57df364c
 
     st.session_state.page = st.sidebar.radio("Go to", pages, index=pages.index(st.session_state.page))
 
