@@ -26,7 +26,6 @@ if st.sidebar.button("Submit", key="submit_button"):
         username = name_input.strip().lower()
         st.session_state.username = username
         
-
         # Ensure user exists in the users table
         existing_user = supabase.table("users").select("id").eq("username", username).execute()
         if not existing_user.data:
@@ -37,7 +36,6 @@ if st.sidebar.button("Submit", key="submit_button"):
             {"username": username},
             on_conflict=["username"]
         ).execute()
-
 
         st.session_state.logged_in = True
         st.rerun()
@@ -51,10 +49,8 @@ if st.session_state.logged_in:
     pages.append("Career Pathfinder" if user_type == "Student" else "Managing Finances")
     pages.extend(["Skill-Up AI", "Meal Planner"])
 
-    
     if "page" not in st.session_state:
         st.session_state.page = pages[0]  # or any default page like "Home"
-
 
     if "page" not in st.session_state or st.session_state.page not in pages:
         st.session_state.page = pages[0]
