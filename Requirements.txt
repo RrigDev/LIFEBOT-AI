@@ -2,4 +2,4 @@ streamlit==1.46.1
 pandas==2.3.1
 altair==5.5.0
 python-dotenv==1.1.1
-supabase==2.16.0
+supabase==2.17.0
