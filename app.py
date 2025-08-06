@@ -25,11 +25,19 @@ if st.sidebar.button("Submit", key="submit_button"):
     if name_input:
         username = name_input.strip().lower()
         st.session_state.username = username
+        
 
         # Ensure user exists in the users table
         existing_user = supabase.table("users").select("id").eq("username", username).execute()
         if not existing_user.data:
             supabase.table("users").insert({"username": username}).execute()
+        
+        st.session_state.logged_in = True
+        supabase.table("users").upsert(
+            {"username": username},
+            on_conflict=["username"]
+        ).execute()
+
 
         st.session_state.logged_in = True
         st.rerun()
@@ -42,6 +50,11 @@ if st.session_state.logged_in:
     pages = ["Home", "Profile", "Daily Companion"]
     pages.append("Career Pathfinder" if user_type == "Student" else "Managing Finances")
     pages.extend(["Skill-Up AI", "Meal Planner"])
+
+    
+    if "page" not in st.session_state:
+        st.session_state.page = pages[0]  # or any default page like "Home"
+
 
     if "page" not in st.session_state or st.session_state.page not in pages:
         st.session_state.page = pages[0]
@@ -94,14 +107,17 @@ if st.session_state.logged_in:
                 due_date = st.date_input("\U0001F4C5 Due Date")
                 category = st.radio("\U0001F3F7️ Category", ["Study", "Work", "Personal", "Fitness", "Other"], horizontal=True)
                 if st.form_submit_button("➕ Add Task") and new_task.strip():
-                    supabase.table("tasks").insert({
-                        "username": st.session_state.username,
-                        "task": new_task.strip(),
-                        "done": False,
-                        "due_date": str(due_date),
-                        "category": category
-                    }).execute()
-                    st.rerun()
+                    try:
+                        supabase.table("tasks").insert({
+                            "username": st.session_state.username,
+                            "task": new_task.strip(),
+                            "done": False,
+                            "due_date": str(due_date),
+                            "category": category
+                        }).execute()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"An error occurred: {e}")
 
             if not df.empty:
                 total = len(df)
@@ -133,13 +149,16 @@ if st.session_state.logged_in:
             mood = st.selectbox("Mood", ["😊 Happy", "😐 Neutral", "😢 Sad", "😡 Angry", "😴 Tired"])
             entry = st.text_area("Write here")
             if st.button("💾 Save Entry") and entry.strip():
-                supabase.table("journals").insert({
-                    "username": st.session_state.username,
-                    "entry": entry.strip(),
-                    "mood": mood,
-                    "date": str(date.today())
-                }).execute()
-                st.success("Entry saved!")
+                try:
+                    supabase.table("journals").insert({
+                        "username": st.session_state.username,
+                        "entry": entry.strip(),
+                        "mood": mood,
+                        "date": str(date.today())
+                    }).execute()
+                    st.success("Entry saved!")
+                except Exception as e:
+                    st.error(f"An error occurred: {e}")
 
             st.subheader("\U0001F4DA Past Entries")
             entries = supabase.table("journals").select("*")\
@@ -176,14 +195,17 @@ if st.session_state.logged_in:
             mood = st.radio("Mood After Meal", ["🙂 Happy", "😐 Neutral", "🙁 Low"], horizontal=True)
 
             if st.button("Save Meal") and meal_name:
-                supabase.table("meals").insert({
-                    "username": st.session_state.username,
-                    "date": today,
-                    "meal_type": meal_type,
-                    "meal_name": meal_name,
-                    "mood": mood
-                }).execute()
-                st.success("Meal logged!")
+                try:
+                    supabase.table("meals").insert({
+                        "username": st.session_state.username,
+                        "date": today,
+                        "meal_type": meal_type,
+                        "meal_name": meal_name,
+                        "mood": mood
+                    }).execute()
+                    st.success("Meal logged!")
+                except Exception as e:
+                    st.error(f"An error occurred: {e}")
 
         with tabs[1]:
             st.subheader("Healthy Meal Suggestions")
