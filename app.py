@@ -7,13 +7,13 @@ import os
 
 # --- Supabase Setup ---
 SUPABASE_URL = "https://zphpikwyhjeybysfpcfn.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwaHBpa3d5aGpleWJ5c2ZwY2ZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI0NjgwMTgsImV4cCI6MjA2ODA0NDAxOH0.2S0VxzExFvYj56BrrcS1dH9xfV9I2Tng_S8VJFrBrS4"
+SUPABASE_KEY = "your_supabase_key_here"  # Replace with your actual Supabase key
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # --- Streamlit Config ---
 st.set_page_config(page_title="LifeBot AI", layout="centered")
 
-# --- Session State Init ---
+# --- Session State Initialization ---
 for key in ["logged_in", "username", "page"]:
     if key not in st.session_state:
         st.session_state[key] = False if key == "logged_in" else ""
@@ -37,7 +37,6 @@ if st.sidebar.button("Submit", key="submit_button"):
             on_conflict=["username"]
         ).execute()
 
-        st.session_state.logged_in = True
         st.rerun()
 
 # --- If Logged In ---
@@ -48,9 +47,6 @@ if st.session_state.logged_in:
     pages = ["Home", "Profile", "Daily Companion"]
     pages.append("Career Pathfinder" if user_type == "Student" else "Managing Finances")
     pages.extend(["Skill-Up AI", "Meal Planner"])
-
-    if "page" not in st.session_state:
-        st.session_state.page = pages[0]  # or any default page like "Home"
 
     if "page" not in st.session_state or st.session_state.page not in pages:
         st.session_state.page = pages[0]
