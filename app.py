@@ -75,7 +75,7 @@ if st.sidebar.button("Submit", key="submit_button"):
         st.session_state.username = username
 
         # Ensure user exists in the users table
-        existing_user = supabase.table("users").select("id").eq("username", username).execute()
+        existing_user = supabase.table("users").select("id").filter("username", "eq", username).execute()
         if not existing_user.data:
             supabase.table("users").insert({"username": username}).execute()
 
