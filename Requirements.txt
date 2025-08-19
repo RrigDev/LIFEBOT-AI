@@ -1,4 +1,7 @@
 streamlit==1.47.0
 pandas==2.3.1
 altair==5.5.0
-supabase-py==2.4.6
+httpx[http2]==0.28.1
+websockets==15.0
+requests==2.31.0
+https://github.com/supabase-community/supabase-py/archive/refs/heads/master.zip
