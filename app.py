@@ -1,91 +1,120 @@
 import streamlit as st
-import pandas as pd
-import altair as alt
-from datetime import datetime, date
+from supabase import create_client, Client
 import os
 
-# --- Supabase Setup with Fallback ---
-try:
-    from supabase import create_client, Client
+# --- Supabase Setup ---
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://your-project.supabase.co")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "your-service-role-key")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-    SUPABASE_URL = "https://zphpikwyhjeybysfpcfn.supabase.co"
-    SUPABASE_KEY = "your_supabase_key_here"  # Replace with your actual Supabase key
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-    SUPABASE_AVAILABLE = True
+st.set_page_config(page_title="LifeBot AI", layout="wide")
 
-except Exception as e:
-    st.warning("⚠️ Running in demo mode (Supabase not connected). Data won't be saved permanently.")
+# --- Session State ---
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
+if "signup" not in st.session_state:
+    st.session_state["signup"] = False
+if "user_id" not in st.session_state:
+    st.session_state["user_id"] = None
 
-    class MockTable:
-        def __init__(self, name):
-            self.name = name
-            self.data = []
+# --- Signup ---
+if st.session_state.get("signup"):
+    st.subheader("Sign Up")
+    username = st.text_input("Choose a username")
+    password = st.text_input("Choose a password", type="password")
+    if st.button("Create Account"):
+        if username and password:
+            existing_user = supabase.table("users").select("id").match({"username": username}).execute()
+            if existing_user.data:
+                st.error("Username already exists! Please choose another.")
+            else:
+                supabase.table("users").insert({"username": username, "password": password}).execute()
+                st.success("Account created! You can now log in.")
+                st.session_state["signup"] = False
+        else:
+            st.warning("Please enter both username and password.")
 
-        def select(self, *args, **kwargs):
-            return type("Resp", (), {"data": self.data})
+# --- Login ---
+elif not st.session_state["logged_in"]:
+    st.subheader("Login")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+    if st.button("Login"):
+        if username and password:
+            user = supabase.table("users").select("id").match({"username": username, "password": password}).execute()
+            if user.data:
+                st.session_state["logged_in"] = True
+                st.session_state["user_id"] = user.data[0]["id"]
+                st.success(f"Welcome back, {username}!")
+            else:
+                st.error("Invalid username or password.")
+        else:
+            st.warning("Please enter both username and password.")
 
-        def insert(self, row):
-            if isinstance(row, dict):
-                self.data.append(row)
-            elif isinstance(row, list):
-                self.data.extend(row)
-            return type("Resp", (), {"data": row})
+    if st.button("Sign Up Instead"):
+        st.session_state["signup"] = True
 
-        def upsert(self, row, **kwargs):
-            self.insert(row)
-            return type("Resp", (), {"data": row})
+# --- Main App ---
+else:
+    st.title("🌟 LifeBot AI")
 
-        def update(self, row):
-            return type("Resp", (), {"data": row})
+    menu = st.sidebar.radio("Navigation", ["Tasks", "Journals", "Meal Planner", "Profile", "Logout"])
 
-        def delete(self):
-            return self
+    # --- Tasks Module ---
+    if menu == "Tasks":
+        st.header("✅ Tasks")
+        task_input = st.text_input("New Task")
+        if st.button("Add Task"):
+            if task_input:
+                supabase.table("tasks").insert({"user_id": st.session_state["user_id"], "task": task_input}).execute()
+                st.success("Task added!")
 
-        def eq(self, *args, **kwargs):
-            return self
+        tasks = supabase.table("tasks").select("*").match({"user_id": st.session_state["user_id"]}).execute()
+        if tasks.data:
+            for t in tasks.data:
+                st.write(f"- {t['task']}")
 
-        def order(self, *args, **kwargs):
-            return self
+    # --- Journals Module ---
+    elif menu == "Journals":
+        st.header("📔 Journals")
+        journal_entry = st.text_area("Write your journal entry here...")
+        if st.button("Save Entry"):
+            if journal_entry:
+                supabase.table("journals").insert(
+                    {"user_id": st.session_state["user_id"], "entry": journal_entry}
+                ).execute()
+                st.success("Journal saved!")
 
-        def execute(self):
-            return type("Resp", (), {"data": self.data})
+        journals = supabase.table("journals").select("*").match({"user_id": st.session_state["user_id"]}).execute()
+        if journals.data:
+            for j in journals.data:
+                st.markdown(f"**Entry {j['id']}**: {j['entry']}")
 
-    class MockClient:
-        def table(self, name):
-            return MockTable(name)
+    # --- Meal Planner Module ---
+    elif menu == "Meal Planner":
+        st.header("🍽 Meal Planner")
+        meal = st.text_input("Meal")
+        if st.button("Add Meal"):
+            if meal:
+                supabase.table("meals").insert({"user_id": st.session_state["user_id"], "meal": meal}).execute()
+                st.success("Meal added!")
 
-    supabase = MockClient()
-    SUPABASE_AVAILABLE = False
+        meals = supabase.table("meals").select("*").match({"user_id": st.session_state["user_id"]}).execute()
+        if meals.data:
+            for m in meals.data:
+                st.write(f"- {m['meal']}")
 
+    # --- Profile Module ---
+    elif menu == "Profile":
+        st.header("👤 Profile")
+        st.write(f"User ID: {st.session_state['user_id']}")
 
-# --- Streamlit Config ---
-st.set_page_config(page_title="LifeBot AI", layout="centered")
+    # --- Logout ---
+    elif menu == "Logout":
+        st.session_state["logged_in"] = False
+        st.session_state["user_id"] = None
+        st.success("You have been logged out.")
 
-# --- Session State Initialization ---
-for key in ["logged_in", "username", "page"]:
-    if key not in st.session_state:
-        st.session_state[key] = False if key == "logged_in" else ""
-
-# --- Login via Name Input ---
-st.sidebar.title("\U0001F464 Welcome")
-name_input = st.sidebar.text_input("Enter your name", key="username_input")
-if st.sidebar.button("Submit", key="submit_button"):
-    if name_input:
-        username = name_input.strip().lower()
-        st.session_state.username = username
-
-        # Ensure user exists in the users table
-        existing_user = supabase.table("users").select("id").filter("username", "eq", username).execute()
-        if not existing_user.data:
-            supabase.table("users").insert({"username": username}).execute()
-
-        st.session_state.logged_in = True
-        supabase.table("users").upsert(
-            {"username": username},
-            on_conflict=["username"]
-        ).execute()
-
-        st.rerun()
 
 # --- If Logged In ---
 if st.session_state.logged_in:
