@@ -2,13 +2,61 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 from datetime import datetime, date
-from supabase import create_client, Client
 import os
 
-# --- Supabase Setup ---
-SUPABASE_URL = "https://zphpikwyhjeybysfpcfn.supabase.co"
-SUPABASE_KEY = "your_supabase_key_here"  # Replace with your actual Supabase key
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# --- Supabase Setup with Fallback ---
+try:
+    from supabase import create_client, Client
+
+    SUPABASE_URL = "https://zphpikwyhjeybysfpcfn.supabase.co"
+    SUPABASE_KEY = "your_supabase_key_here"  # Replace with your actual Supabase key
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    SUPABASE_AVAILABLE = True
+
+except Exception as e:
+    st.warning("⚠️ Running in demo mode (Supabase not connected). Data won't be saved permanently.")
+
+    class MockTable:
+        def __init__(self, name):
+            self.name = name
+            self.data = []
+
+        def select(self, *args, **kwargs):
+            return type("Resp", (), {"data": self.data})
+
+        def insert(self, row):
+            if isinstance(row, dict):
+                self.data.append(row)
+            elif isinstance(row, list):
+                self.data.extend(row)
+            return type("Resp", (), {"data": row})
+
+        def upsert(self, row, **kwargs):
+            self.insert(row)
+            return type("Resp", (), {"data": row})
+
+        def update(self, row):
+            return type("Resp", (), {"data": row})
+
+        def delete(self):
+            return self
+
+        def eq(self, *args, **kwargs):
+            return self
+
+        def order(self, *args, **kwargs):
+            return self
+
+        def execute(self):
+            return type("Resp", (), {"data": self.data})
+
+    class MockClient:
+        def table(self, name):
+            return MockTable(name)
+
+    supabase = MockClient()
+    SUPABASE_AVAILABLE = False
+
 
 # --- Streamlit Config ---
 st.set_page_config(page_title="LifeBot AI", layout="centered")
@@ -25,12 +73,12 @@ if st.sidebar.button("Submit", key="submit_button"):
     if name_input:
         username = name_input.strip().lower()
         st.session_state.username = username
-        
+
         # Ensure user exists in the users table
         existing_user = supabase.table("users").select("id").eq("username", username).execute()
         if not existing_user.data:
             supabase.table("users").insert({"username": username}).execute()
-        
+
         st.session_state.logged_in = True
         supabase.table("users").upsert(
             {"username": username},
@@ -123,16 +171,16 @@ if st.session_state.logged_in:
                         done = st.checkbox(
                             f"{row['task']} [{row['category']}] (Due: {row['due_date']})",
                             value=row["done"],
-                            key=f"done_{row['id']}"
+                            key=f"done_{row.get('id', _)}"
                         )
                     with col3:
-                        if st.button("🗑️", key=f"del_{row['id']}"):
-                            supabase.table("tasks").delete().eq("id", row["id"]).execute()
+                        if st.button("🗑️", key=f"del_{row.get('id', _)}"):
+                            supabase.table("tasks").delete().eq("id", row.get("id", _)).execute()
                             st.rerun()
 
                     if done != row["done"]:
                         supabase.table("tasks").update({"done": done, "completed_date": str(date.today()) if done else None})\
-                            .eq("id", row["id"]).execute()
+                            .eq("id", row.get("id", _)).execute()
                         st.rerun()
 
         # --- Journal ---
@@ -156,7 +204,7 @@ if st.session_state.logged_in:
             entries = supabase.table("journals").select("*")\
                 .eq("username", st.session_state.username).order("date", desc=True).execute().data
             for e in entries:
-                st.markdown(f"**{e['date']}** — *{e['mood']}*\n> {e['entry']}")
+                st.markdown(f"**{e.get('date', '')}** — *{e.get('mood', '')}*\n> {e.get('entry', '')}")
 
         # --- Companion ---
         with tabs[2]:
