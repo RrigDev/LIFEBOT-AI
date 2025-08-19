@@ -1,10 +1,10 @@
-import streamlit as st
-from supabase.client import create_client, Client
-import os
+iimport streamlit as st
+from supabase import create_client, Client
 
 # --- Supabase Setup ---
-SUPABASE_URL = os.getenv("SUPABASE_URL", "https://your-project.supabase.co")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "your-service-role-key")
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 st.set_page_config(page_title="LifeBot AI", layout="wide")
